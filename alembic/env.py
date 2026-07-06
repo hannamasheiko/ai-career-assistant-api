@@ -9,6 +9,8 @@ from alembic import context
 from app.core.config import settings
 from app.db.base import Base
 
+import app.models  # noqa: F401
+
 config = context.config
 
 if config.config_file_name is not None:
