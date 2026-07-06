@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.chains.parse_resume_chain import parse_resume_chain
@@ -14,12 +16,18 @@ async def create_resume_from_text(
 
     parsed_resume = await parse_resume_chain(data.raw_text)
 
+    years_of_experience = (
+        Decimal(str(parsed_resume.candidate_profile.years_of_experience))
+        if parsed_resume.candidate_profile.years_of_experience is not None
+        else None
+    )
+
     if data.candidate_profile_id is None:
         candidate_profile = CandidateProfile(
             full_name=parsed_resume.candidate_profile.full_name,
             target_role=parsed_resume.candidate_profile.target_role,
             experience_level=parsed_resume.candidate_profile.experience_level,
-            years_of_experience=parsed_resume.candidate_profile.years_of_experience,
+            years_of_experience=years_of_experience,
             english_level=parsed_resume.candidate_profile.english_level,
             location=parsed_resume.candidate_profile.location,
             desired_salary_min=parsed_resume.candidate_profile.desired_salary_min,
@@ -37,7 +45,7 @@ async def create_resume_from_text(
         candidate_profile.full_name = parsed_resume.candidate_profile.full_name
         candidate_profile.target_role = parsed_resume.candidate_profile.target_role
         candidate_profile.experience_level = parsed_resume.candidate_profile.experience_level
-        candidate_profile.years_of_experience = parsed_resume.candidate_profile.years_of_experience
+        candidate_profile.years_of_experience = years_of_experience
         candidate_profile.english_level = parsed_resume.candidate_profile.english_level
         candidate_profile.location = parsed_resume.candidate_profile.location
         candidate_profile.desired_salary_min = parsed_resume.candidate_profile.desired_salary_min

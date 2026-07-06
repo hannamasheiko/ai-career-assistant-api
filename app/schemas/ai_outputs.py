@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from pydantic import BaseModel, Field
 
 
@@ -9,7 +7,7 @@ class ParsedCandidateProfile(BaseModel):
     full_name: str = Field(..., max_length=255)
     target_role: str | None = Field(default=None, max_length=255)
     experience_level: str | None = Field(default=None, max_length=100)
-    years_of_experience: Decimal | None = Field(default=None, ge=0, max_digits=4, decimal_places=1)
+    years_of_experience: float | None = Field(default=None, ge=0, le=99.9)
     english_level: str | None = Field(default=None, max_length=100)
     location: str | None = Field(default=None, max_length=255)
     desired_salary_min: int | None = Field(default=None, ge=0)
