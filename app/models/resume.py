@@ -8,6 +8,8 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.candidate_profile import CandidateProfile
+    from app.models.resume_analysis import ResumeAnalysis
+    from app.models.tracked_vacancy import TrackedVacancy
 
 
 class ResumeDocument(Base):
@@ -47,9 +49,19 @@ class ResumeDocument(Base):
         back_populates="resume_documents",
     )
 
+    analysis: Mapped["ResumeAnalysis"] = relationship(
+        back_populates="resume_document",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
     sections: Mapped[list["ResumeSection"]] = relationship(
         back_populates="resume_document",
         cascade="all, delete-orphan",
+    )
+
+    tracked_vacancies: Mapped[list["TrackedVacancy"]] = relationship(
+        back_populates="resume_document",
     )
 
 

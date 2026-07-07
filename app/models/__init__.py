@@ -5,6 +5,8 @@ from app.models.match_analysis import MatchAnalysis
 from app.models.resume import ResumeDocument, ResumeSection
 from app.models.tracked_vacancy import TrackedVacancy
 from app.models.vacancy import Vacancy, VacancyAnalysis
+from app.models.user import User
+from app.models.resume_analysis import ResumeAnalysis
 
 __all__ = [
     "CandidateProfile",
@@ -16,4 +18,6 @@ __all__ = [
     "MatchAnalysis",
     "GeneratedContent",
     "Interaction",
+    "User",
+    "ResumeAnalysis",
 ]

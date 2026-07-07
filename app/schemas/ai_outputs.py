@@ -1,18 +1,21 @@
 from pydantic import BaseModel, Field
 
 
-class ParsedCandidateProfile(BaseModel):
-    """Structured candidate profile extracted from resume text by AI."""
+class ParsedResumeAnalysis(BaseModel):
+    """Structured resume analysis extracted from resume text by AI."""
 
     full_name: str = Field(..., max_length=255)
     target_role: str | None = Field(default=None, max_length=255)
-    experience_level: str | None = Field(default=None, max_length=100)
     years_of_experience: float | None = Field(default=None, ge=0, le=99.9)
     english_level: str | None = Field(default=None, max_length=100)
     location: str | None = Field(default=None, max_length=255)
-    desired_salary_min: int | None = Field(default=None, ge=0)
+
     skills: list[str] | None = None
     summary: str | None = None
+
+    education_level: str | None = Field(default=None, max_length=100)
+    education_summary: str | None = None
+    languages: list[str] | None = None
 
 
 class ParsedResumeSection(BaseModel):
@@ -27,5 +30,5 @@ class ParsedResumeSection(BaseModel):
 class ParsedResume(BaseModel):
     """Structured AI output for resume parsing."""
 
-    candidate_profile: ParsedCandidateProfile
+    resume_analysis: ParsedResumeAnalysis
     sections: list[ParsedResumeSection]

@@ -1,8 +1,7 @@
 from datetime import datetime
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Integer, Numeric, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -10,25 +9,33 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.resume import ResumeDocument
-    from app.models.tracked_vacancy import TrackedVacancy
+    from app.models.user import User
 
 
 class CandidateProfile(Base):
-    """Candidate profile with general career information used for resume analysis and vacancy matching."""
+    """Stable candidate profile connected to a user account."""
 
     __tablename__ = "candidate_profiles"
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+    )
+
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    target_role: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    experience_level: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    years_of_experience: Mapped[Decimal | None] = mapped_column(Numeric(4, 1), nullable=True)
-    english_level: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(100), nullable=True)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    github_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    linkedin_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    preferred_employment_types: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    preferred_work_formats: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     desired_salary_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    skills: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
-    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -42,12 +49,11 @@ class CandidateProfile(Base):
         nullable=False,
     )
 
-    resume_documents: Mapped[list["ResumeDocument"]] = relationship(
+    user: Mapped["User"] = relationship(
         back_populates="candidate_profile",
-        cascade="all, delete-orphan",
     )
 
-    tracked_vacancies: Mapped[list["TrackedVacancy"]] = relationship(
+    resume_documents: Mapped[list["ResumeDocument"]] = relationship(
         back_populates="candidate_profile",
         cascade="all, delete-orphan",
     )
