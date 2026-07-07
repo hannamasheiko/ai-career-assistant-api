@@ -179,6 +179,9 @@ order_index:
     parsed_resume = result["parsed"]
     raw_response = result["raw"]
 
+    if parsed_resume is None:
+        raise RuntimeError("Failed to parse resume into structured output")
+
     usage_metadata = getattr(raw_response, "usage_metadata", None)
 
     if usage_metadata:

@@ -1,20 +1,19 @@
 from pydantic import BaseModel, Field
 
-from app.schemas.candidate_profile import CandidateProfileRead
 from app.schemas.resume import ResumeDocumentRead, ResumeSectionRead
+from app.schemas.resume_analysis import ResumeAnalysisRead
 
 
 class ResumeFromTextRequest(BaseModel):
-    """Request schema for adding a resume from raw text."""
+    """Schema for creating a resume from plain text."""
 
     raw_text: str = Field(..., min_length=50)
-    candidate_profile_id: int | None = None
-    file_name: str | None = Field(default=None, max_length=255)
+    file_name: str | None = None
 
 
 class ResumeIngestionResponse(BaseModel):
-    """Response schema for resume ingestion flow."""
+    """Response schema for resume ingestion."""
 
-    candidate_profile: CandidateProfileRead
     resume_document: ResumeDocumentRead
+    resume_analysis: ResumeAnalysisRead
     resume_sections: list[ResumeSectionRead]
