@@ -22,7 +22,7 @@ async def parse_resume_chain(raw_text: str) -> ParsedResume:
 Ти не оцінюєш кандидата і не робиш висновків про його seniority.
 
 Важливо:
-- Поверни тільки дані, які відповідають структурі ParsedResume: resume_analysis і sections.
+- Поверни тільки дані, які відповідають структурі ParsedResume: resume_analysis, sections і work_experience_periods.
 - Не створюй і не оновлюй профіль кандидата.
 - Не повертай дані, яких немає у схемі.
 - Не додавай пояснення поза структурованою відповіддю.
@@ -64,20 +64,10 @@ target_role:
 - Якщо визначити неможливо — null.
 
 years_of_experience:
-- Орієнтовна кількість років професійного технічного або комерційного досвіду з резюме.
-- Рахуй тільки робочий досвід у компаніях або оплачуваних проєктах, якщо вони явно вказані.
-- Не включай career break у years_of_experience.
-- Якщо період роботи має назву компанії, посаду і дати — рахуй його як професійний досвід, навіть якщо позиція не повністю збігається з target_role.
-- Якщо в резюме є career break з роками, не додавай його до досвіду, навіть якщо в цей період згадано навчання або pet-проєкти.
-- Не включай навчання, курси, pet-проєкти або самоосвіту в years_of_experience.
-- Pet-проєкти можна враховувати в summary і sections, але не в years_of_experience.
-- Якщо є дати роботи, обережно порахуй тривалість за ними.
-- Якщо місяці вказані — враховуй місяці.
-- Не округлюй years_of_experience до цілого числа.
-- Якщо вказані тільки роки без місяців — зроби дуже обережну приблизну оцінку.
-- Якщо неможливо визначити — null.
+- Не розраховуй years_of_experience самостійно.
+- Якщо поле years_of_experience є в resume_analysis, поверни null.
+- Фінальне значення years_of_experience буде пораховане backend-кодом на основі work_experience_periods.
 - Не використовуй це поле для визначення Junior/Middle/Senior.
-- Не завищуй значення.
 
 english_level:
 - Рівень англійської, якщо він прямо вказаний або очевидно позначений у резюме.
@@ -162,6 +152,49 @@ languages:
   "Polish — A2" → "Polish — A2"
 - Якщо в резюме згадана тільки англійська і немає інших мов — поверни null.
 - Якщо секція Languages містить English / Англійська разом з іншими мовами, англійську перенеси тільки в english_level, а в languages залиш інші мови.
+
+Як заповнювати work_experience_periods:
+
+work_experience_periods:
+- Витягни тільки реальні періоди роботи у компаніях, організаціях або оплачуваних проєктах.
+- Не включай career break / career gap / employment gap.
+- Не включай pet-проєкти, навчання, курси, самоосвіту або періоди підготовки.
+- Не включай волонтерство, якщо воно не описане як професійна оплачувана робота.
+- Якщо період роботи має компанію, посаду і дати — додай його в work_experience_periods.
+- Якщо місяць вказаний — заповни start_month або end_month числом від 1 до 12.
+- Якщо місяць не вказаний — залиш відповідне поле month = null.
+- Якщо рік вказаний — заповни start_year або end_year.
+- Якщо рік не вказаний — залиш відповідне поле year = null.
+- Якщо робота триває зараз — is_current=true, end_month=null, end_year=null.
+- Якщо робота завершена — is_current=false і заповни end_month/end_year, якщо вони вказані.
+- is_commercial=true для роботи в компаніях, організаціях або оплачуваних проєктах.
+- Не вигадуй дати, місяці, компанії або посади.
+
+Приклад:
+Якщо резюме містить:
+
+Work Experience
+
+TechNova Solutions
+Period: 03.2020 - 08.2022
+Position: Backend Developer
+
+Bright Apps
+Period: 06.2018 - 01.2020
+Position: Junior Python Developer
+
+Career Break
+Period: 09.2022 - 12.2023
+Relocation and family reasons. Completed several online courses and personal projects.
+
+Pet Project
+Task Manager API
+Built a FastAPI project with PostgreSQL and Docker.
+
+то work_experience_periods має містити тільки TechNova Solutions і Bright Apps.
+
+Career Break не додавай у work_experience_periods.
+Pet Project не додавай у work_experience_periods.
 
 Як заповнювати sections:
 

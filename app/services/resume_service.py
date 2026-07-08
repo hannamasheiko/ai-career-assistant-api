@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.models.candidate_profile import CandidateProfile
 from app.models.resume import ResumeDocument, ResumeSection
 from app.models.resume_analysis import ResumeAnalysis
+from app.services.experience_calculator import calculate_years_of_experience
 
 
 async def create_resume_from_text(
@@ -21,10 +22,8 @@ async def create_resume_from_text(
 
     parsed_analysis = parsed_resume.resume_analysis
 
-    years_of_experience = (
-        Decimal(str(parsed_analysis.years_of_experience))
-        if parsed_analysis.years_of_experience is not None
-        else None
+    years_of_experience = calculate_years_of_experience(
+        parsed_resume.work_experience_periods,
     )
 
     resume_document = ResumeDocument(
