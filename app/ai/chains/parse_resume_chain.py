@@ -4,6 +4,8 @@ from langchain_openai import ChatOpenAI
 from app.core.config import settings
 from app.schemas.ai_outputs import ParsedResume
 
+from app.services.openai_cost_tracker import print_openai_usage
+
 
 async def parse_resume_chain(raw_text: str) -> ParsedResume:
     """Parse raw resume text into structured resume analysis and resume sections."""
@@ -303,22 +305,11 @@ order_index:
         output_tokens = usage_metadata.get("output_tokens", 0)
         total_tokens = usage_metadata.get("total_tokens", 0)
 
-        input_cost = (input_tokens / 1_000_000) * 0.40
-        output_cost = (output_tokens / 1_000_000) * 1.60
-        total_cost = input_cost + output_cost
-
-        print("\n========== OPENAI TOKEN USAGE ==========")
-        print(f"Model: {settings.openai_model}")
-        print(f"Input tokens: {input_tokens}")
-        print(f"Output tokens: {output_tokens}")
-        print(f"Total tokens: {total_tokens}")
-        print(f"Estimated input cost: ${input_cost:.6f}")
-        print(f"Estimated output cost: ${output_cost:.6f}")
-        print(f"Estimated total cost: ${total_cost:.6f}")
-        print("========================================\n")
-    else:
-        print("\n========== OPENAI TOKEN USAGE ==========")
-        print("Token usage metadata was not returned.")
-        print("========================================\n")
+        print_openai_usage(
+            model=settings.openai_model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+        )
 
     return parsed_resume
