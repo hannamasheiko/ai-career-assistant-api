@@ -66,3 +66,18 @@ class ParsedVacancyDetails(BaseModel):
     currency: str | None = Field(default=None, max_length=20)
 
     cleaned_text: str | None = None
+
+class ParsedVacancyAnalysis(BaseModel):
+    """Structured AI analysis of a vacancy."""
+
+    experience_level: str | None = Field(default=None, max_length=100)
+    english_level: str | None = Field(default=None, max_length=100)
+
+    required_skills: list[str] | None = None
+    optional_skills: list[str] | None = None
+    responsibilities: list[str] | None = None
+    red_flags: list[str] | None = None
+    green_flags: list[str] | None = None
+
+    summary: str | None = None
+    recommendation: str | None = Field(default=None, max_length=100)

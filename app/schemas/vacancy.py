@@ -3,13 +3,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-class VacancyFromTextRequest(BaseModel):
-    """Request schema for creating a vacancy from copied vacancy page text."""
-
-    raw_text: str = Field(..., min_length=1)
-    source_url: str | None = None
-
-
 class VacancyResponse(BaseModel):
     """Response schema for vacancy data."""
 
@@ -44,3 +37,38 @@ class VacancyIngestionResponse(BaseModel):
     """Response schema for vacancy ingestion from text."""
 
     vacancy: VacancyResponse
+    analysis: VacancyAnalysisResponse | None = None
+
+class VacancyAnalysisResponse(BaseModel):
+    """Response schema for AI-generated vacancy analysis."""
+
+    id: int
+    vacancy_id: int
+
+    experience_level: str | None
+    english_level: str | None
+
+    required_skills: list[str] | None
+    optional_skills: list[str] | None
+    responsibilities: list[str] | None
+    red_flags: list[str] | None
+    green_flags: list[str] | None
+
+    summary: str | None
+    recommendation: str | None
+
+    ai_model: str | None
+    prompt_version: str | None
+
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+class VacancyAnalysisIngestionResponse(BaseModel):
+    """Response schema for vacancy analysis generation."""
+
+    analysis: VacancyAnalysisResponse
+
