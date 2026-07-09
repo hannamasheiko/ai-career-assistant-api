@@ -19,6 +19,14 @@ from app.services.tracked_vacancy_service import (
     update_tracked_vacancy,
 )
 
+from app.core.config import settings
+from app.schemas.match_analysis import MatchAnalysisResponse
+from app.services.match_analysis_service import (
+    create_or_update_match_analysis,
+    get_match_analysis_by_tracked_vacancy_id,
+    get_tracked_vacancy_for_match_analysis,
+)
+
 router = APIRouter(
     prefix="/tracked-vacancies",
     tags=["tracked-vacancies"],
@@ -155,3 +163,79 @@ async def update_tracked_vacancy_endpoint(
     )
 
     return updated_tracked_vacancy
+
+@router.post(
+    "/{tracked_vacancy_id}/match-analysis",
+    response_model=MatchAnalysisResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_match_analysis_endpoint(
+    tracked_vacancy_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MatchAnalysisResponse:
+    """Create or update match analysis for tracked vacancy."""
+
+    tracked_vacancy = await get_tracked_vacancy_for_match_analysis(
+        db=db,
+        tracked_vacancy_id=tracked_vacancy_id,
+        user_id=current_user.id,
+    )
+
+    if tracked_vacancy is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tracked vacancy not found.",
+        )
+
+    try:
+        match_analysis = await create_or_update_match_analysis(
+            db=db,
+            tracked_vacancy=tracked_vacancy,
+            ai_model=settings.openai_model,
+            prompt_version="match_analysis_v1",
+        )
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(error),
+        ) from error
+
+    return match_analysis
+
+@router.get(
+    "/{tracked_vacancy_id}/match-analysis",
+    response_model=MatchAnalysisResponse,
+)
+async def get_match_analysis_endpoint(
+    tracked_vacancy_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MatchAnalysisResponse:
+    """Get match analysis for tracked vacancy."""
+
+    tracked_vacancy = await get_tracked_vacancy_for_match_analysis(
+        db=db,
+        tracked_vacancy_id=tracked_vacancy_id,
+        user_id=current_user.id,
+    )
+
+    if tracked_vacancy is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tracked vacancy not found.",
+        )
+
+    match_analysis = await get_match_analysis_by_tracked_vacancy_id(
+        db=db,
+        tracked_vacancy_id=tracked_vacancy.id,
+    )
+
+    if match_analysis is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Match analysis not found.",
+        )
+
+    return match_analysis
+

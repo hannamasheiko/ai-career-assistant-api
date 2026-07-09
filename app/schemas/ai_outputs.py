@@ -81,3 +81,17 @@ class ParsedVacancyAnalysis(BaseModel):
 
     summary: str | None = None
     recommendation: str | None = Field(default=None, max_length=100)
+
+class ParsedMatchAnalysis(BaseModel):
+    """Structured AI output for resume-to-vacancy match analysis."""
+
+    match_score: int | None = Field(default=None, ge=0, le=100)
+    recommendation: str | None = Field(default=None, max_length=100)
+
+    strong_matches: list[str] | None = None
+    partial_matches: list[str] | None = None
+    missing_skills: list[str] | None = None
+    risk_points: list[str] | None = None
+
+    reasoning_summary: str | None = None
+
