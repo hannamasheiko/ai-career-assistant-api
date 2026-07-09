@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -15,6 +15,13 @@ class MatchAnalysis(Base):
     """AI-generated match analysis between a candidate  and a tracked vacancy."""
 
     __tablename__ = "match_analyses"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tracked_vacancy_id",
+            name="uq_match_analyses_tracked_vacancy_id",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
