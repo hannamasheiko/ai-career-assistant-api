@@ -47,3 +47,22 @@ class ParsedResume(BaseModel):
     work_experience_periods: list[ParsedWorkExperiencePeriod] | None = None
     resume_analysis: ParsedResumeAnalysis
     sections: list[ParsedResumeSection]
+
+class ParsedVacancyDetails(BaseModel):
+    """Structured vacancy details extracted from copied vacancy text by AI."""
+
+    company_name: str | None = Field(default=None, max_length=255)
+    position_title: str | None = Field(default=None, max_length=255)
+
+    source: str | None = Field(default=None, max_length=100)
+    source_url: str | None = Field(default=None, max_length=1000)
+
+    location: str | None = Field(default=None, max_length=255)
+    work_format: str | None = Field(default=None, max_length=50)
+    employment_type: str | None = Field(default=None, max_length=50)
+
+    salary_min: int | None = Field(default=None, ge=0)
+    salary_max: int | None = Field(default=None, ge=0)
+    currency: str | None = Field(default=None, max_length=20)
+
+    cleaned_text: str | None = None

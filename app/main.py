@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.api.auth import router as auth_router
 from app.api.profile import router as profile_router
 from app.api.resumes import router as resumes_router
+from app.api.vacancies import router as vacancies_router
 
 
 app = FastAPI(
@@ -26,4 +27,5 @@ app.include_router(db_health_router)
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(resumes_router)
+app.include_router(vacancies_router)
 
