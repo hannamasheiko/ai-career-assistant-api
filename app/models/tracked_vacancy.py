@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -18,6 +18,14 @@ class TrackedVacancy(Base):
     """Tracked vacancy connected to a specific resume document and used for job search workflow."""
 
     __tablename__ = "tracked_vacancies"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "resume_document_id",
+            "vacancy_id",
+            name="uq_tracked_vacancies_resume_document_id_vacancy_id",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
