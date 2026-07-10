@@ -95,3 +95,7 @@ class ParsedMatchAnalysis(BaseModel):
 
     reasoning_summary: str | None = None
 
+class ParsedGeneratedContent(BaseModel):
+    """Structured AI output for generated content."""
+
+    generated_text: str = Field(..., min_length=1)

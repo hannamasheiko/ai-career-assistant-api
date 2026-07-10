@@ -8,6 +8,7 @@ from app.api.profile import router as profile_router
 from app.api.resumes import router as resumes_router
 from app.api.vacancies import router as vacancies_router
 from app.api.tracked_vacancies import router as tracked_vacancies_router
+from app.api.generated_contents import router as generated_contents_router
 
 
 app = FastAPI(
@@ -30,5 +31,6 @@ app.include_router(profile_router)
 app.include_router(resumes_router)
 app.include_router(vacancies_router)
 app.include_router(tracked_vacancies_router)
+app.include_router(generated_contents_router)
 
 
