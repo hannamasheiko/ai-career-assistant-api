@@ -133,6 +133,7 @@ async def create_or_update_match_analysis(
         await parse_match_analysis_chain(
             resume_analysis=resume_analysis,
             resume_sections=resume_sections,
+            vacancy=vacancy,
             vacancy_analysis=vacancy_analysis,
             resume_text=resume_text,
             vacancy_text=vacancy_text,

@@ -1,6 +1,6 @@
 from app.models.resume import ResumeSection
 from app.models.resume_analysis import ResumeAnalysis
-from app.models.vacancy import VacancyAnalysis
+from app.models.vacancy import Vacancy, VacancyAnalysis
 
 
 def build_resume_analysis_data(
@@ -45,6 +45,23 @@ def build_resume_sections_data(
         }
         for section in sorted_sections
     ]
+
+
+def build_vacancy_data(
+    vacancy: Vacancy,
+) -> dict:
+    """Build structured vacancy data for match analysis."""
+
+    return {
+        "company_name": vacancy.company_name,
+        "position_title": vacancy.position_title,
+        "location": vacancy.location,
+        "work_format": vacancy.work_format,
+        "employment_type": vacancy.employment_type,
+        "salary_min": vacancy.salary_min,
+        "salary_max": vacancy.salary_max,
+        "currency": vacancy.currency,
+    }
 
 
 def build_vacancy_analysis_data(

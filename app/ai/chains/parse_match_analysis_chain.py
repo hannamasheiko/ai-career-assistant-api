@@ -7,11 +7,12 @@ from app.ai.context_builders.match_analysis_context import (
     build_resume_analysis_data,
     build_resume_sections_data,
     build_vacancy_analysis_data,
+    build_vacancy_data,
 )
 from app.core.config import settings
 from app.models.resume import ResumeSection
 from app.models.resume_analysis import ResumeAnalysis
-from app.models.vacancy import VacancyAnalysis
+from app.models.vacancy import Vacancy, VacancyAnalysis
 from app.schemas.ai_outputs import ParsedMatchAnalysis
 from app.services.openai_cost_tracker import print_openai_usage
 
@@ -19,6 +20,7 @@ from app.services.openai_cost_tracker import print_openai_usage
 async def parse_match_analysis_chain(
     resume_analysis: ResumeAnalysis,
     resume_sections: list[ResumeSection],
+    vacancy: Vacancy,
     vacancy_analysis: VacancyAnalysis,
     resume_text: str,
     vacancy_text: str,
@@ -39,7 +41,11 @@ async def parse_match_analysis_chain(
         ensure_ascii=False,
         indent=2,
     )
-
+    vacancy_json = json.dumps(
+        build_vacancy_data(vacancy),
+        ensure_ascii=False,
+        indent=2,
+    )
     vacancy_analysis_json = json.dumps(
         build_vacancy_analysis_data(vacancy_analysis),
         ensure_ascii=False,
