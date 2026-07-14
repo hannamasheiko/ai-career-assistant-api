@@ -32,13 +32,6 @@ class VacancyResponse(BaseModel):
         "from_attributes": True,
     }
 
-
-class VacancyIngestionResponse(BaseModel):
-    """Response schema for vacancy ingestion from text."""
-
-    vacancy: VacancyResponse
-    analysis: VacancyAnalysisResponse | None = None
-
 class VacancyAnalysisResponse(BaseModel):
     """Response schema for AI-generated vacancy analysis."""
 
@@ -71,4 +64,10 @@ class VacancyAnalysisIngestionResponse(BaseModel):
     """Response schema for vacancy analysis generation."""
 
     analysis: VacancyAnalysisResponse
+
+class VacancyIngestionResponse(BaseModel):
+    """Response schema for vacancy ingestion from text."""
+
+    vacancy: VacancyResponse
+    analysis: VacancyAnalysisResponse | None = None
 
