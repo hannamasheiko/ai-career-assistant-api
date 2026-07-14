@@ -4,12 +4,14 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
 from app.ai.context_builders.match_analysis_context import (
+    build_candidate_profile_data,
     build_resume_analysis_data,
     build_resume_sections_data,
     build_vacancy_analysis_data,
     build_vacancy_data,
 )
 from app.core.config import settings
+from app.models.candidate_profile import CandidateProfile
 from app.models.resume import ResumeSection
 from app.models.resume_analysis import ResumeAnalysis
 from app.models.vacancy import Vacancy, VacancyAnalysis
@@ -18,6 +20,7 @@ from app.services.openai_cost_tracker import print_openai_usage
 
 
 async def parse_match_analysis_chain(
+    candidate_profile: CandidateProfile,
     resume_analysis: ResumeAnalysis,
     resume_sections: list[ResumeSection],
     vacancy: Vacancy,
@@ -29,6 +32,12 @@ async def parse_match_analysis_chain(
 
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
+
+    candidate_profile_json = json.dumps(
+        build_candidate_profile_data(candidate_profile),
+        ensure_ascii=False,
+        indent=2,
+    )
 
     resume_analysis_json = json.dumps(
         build_resume_analysis_data(resume_analysis),
@@ -296,14 +305,37 @@ recommendation:
 """,
             ),
             (
-                "user",
-                """
-Резюме кандидата:
-{resume_text}
-
-Вакансія:
-{vacancy_text}
-""",
+                    "user",
+                    """
+                Виконай match analysis для наведених кандидата і вакансії.
+            
+                === КАНДИДАТ: СТРУКТУРОВАНІ ДАНІ ===
+            
+                ResumeAnalysis:
+                {resume_analysis_json}
+            
+                ResumeSections:
+                {resume_sections_json}
+            
+                CandidateProfile:
+                {candidate_profile_json}
+            
+                === ВАКАНСІЯ: СТРУКТУРОВАНІ ДАНІ ===
+            
+                Vacancy:
+                {vacancy_json}
+            
+                VacancyAnalysis:
+                {vacancy_analysis_json}
+            
+                === ДОДАТКОВІ ТЕКСТОВІ ДЖЕРЕЛА ===
+            
+                Resume text:
+                {resume_text}
+            
+                Vacancy cleaned_text:
+                {vacancy_text}
+                """,
             ),
         ]
     )
@@ -323,6 +355,11 @@ recommendation:
 
     result = await chain.ainvoke(
         {
+            "resume_analysis_json": resume_analysis_json,
+            "resume_sections_json": resume_sections_json,
+            "candidate_profile_json": candidate_profile_json,
+            "vacancy_json": vacancy_json,
+            "vacancy_analysis_json": vacancy_analysis_json,
             "resume_text": resume_text,
             "vacancy_text": vacancy_text,
         }

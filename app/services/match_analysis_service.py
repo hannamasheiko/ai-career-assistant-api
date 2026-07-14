@@ -8,6 +8,7 @@ from app.models.resume import ResumeDocument
 from app.models.tracked_vacancy import TrackedVacancy
 from app.models.vacancy import Vacancy, VacancyAnalysis
 from app.schemas.ai_outputs import ParsedMatchAnalysis
+from app.models.candidate_profile import CandidateProfile
 
 
 async def get_match_analysis_by_tracked_vacancy_id(
@@ -73,6 +74,11 @@ async def get_tracked_vacancy_for_match_analysis(
             selectinload(
                 TrackedVacancy.resume_document
             ).selectinload(
+                ResumeDocument.candidate_profile
+            ),
+            selectinload(
+                TrackedVacancy.resume_document
+            ).selectinload(
                 ResumeDocument.analysis
             ),
             selectinload(
@@ -109,6 +115,7 @@ async def create_or_update_match_analysis(
 
     resume_document = tracked_vacancy.resume_document
     vacancy = tracked_vacancy.vacancy
+    candidate_profile = resume_document.candidate_profile
 
     resume_analysis = resume_document.analysis
     resume_sections = resume_document.sections
@@ -131,6 +138,7 @@ async def create_or_update_match_analysis(
 
     parsed_match_analysis: ParsedMatchAnalysis = (
         await parse_match_analysis_chain(
+            candidate_profile=candidate_profile,
             resume_analysis=resume_analysis,
             resume_sections=resume_sections,
             vacancy=vacancy,

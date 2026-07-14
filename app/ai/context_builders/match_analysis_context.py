@@ -1,6 +1,28 @@
 from app.models.resume import ResumeSection
 from app.models.resume_analysis import ResumeAnalysis
 from app.models.vacancy import Vacancy, VacancyAnalysis
+from app.models.candidate_profile import CandidateProfile
+
+
+def build_candidate_profile_data(
+    candidate_profile: CandidateProfile,
+) -> dict:
+    """Build structured candidate profile data for match analysis."""
+
+    return {
+        "location": candidate_profile.location,
+        "preferred_employment_types": (
+            candidate_profile.preferred_employment_types
+        ),
+        "preferred_work_formats": candidate_profile.preferred_work_formats,
+        "preferred_locations": candidate_profile.preferred_locations,
+        "desired_roles": candidate_profile.desired_roles,
+        "desired_salary_min": candidate_profile.desired_salary_min,
+        "desired_salary_currency": (
+            candidate_profile.desired_salary_currency
+        ),
+        "willing_to_relocate": candidate_profile.willing_to_relocate,
+    }
 
 
 def build_resume_analysis_data(
