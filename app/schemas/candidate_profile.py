@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from app.schemas.types import CurrencyCode
 
 
 class CandidateProfileBase(BaseModel):
@@ -16,7 +17,14 @@ class CandidateProfileBase(BaseModel):
 
     preferred_employment_types: list[str] | None = None
     preferred_work_formats: list[str] | None = None
+    preferred_locations: list[str] | None = None
+    willing_to_relocate: bool | None = None
+
     desired_salary_min: int | None = Field(default=None, ge=0)
+    desired_salary_currency: CurrencyCode | None = None
+
+    desired_roles: list[str] | None = None
+
 
 
 class CandidateProfileCreate(CandidateProfileBase):
@@ -38,7 +46,13 @@ class CandidateProfileUpdate(BaseModel):
 
     preferred_employment_types: list[str] | None = None
     preferred_work_formats: list[str] | None = None
+    preferred_locations: list[str] | None = None
+    willing_to_relocate: bool | None = None
+
     desired_salary_min: int | None = Field(default=None, ge=0)
+    desired_salary_currency: CurrencyCode | None = None
+
+    desired_roles: list[str] | None = None
 
 
 class CandidateProfileRead(CandidateProfileBase):

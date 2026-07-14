@@ -34,7 +34,11 @@ async def create_candidate_profile(
         linkedin_url=data.linkedin_url,
         preferred_employment_types=data.preferred_employment_types,
         preferred_work_formats=data.preferred_work_formats,
+        preferred_locations=data.preferred_locations,
+        desired_roles=data.desired_roles,
         desired_salary_min=data.desired_salary_min,
+        desired_salary_currency=data.desired_salary_currency,
+        willing_to_relocate=data.willing_to_relocate,
     )
 
     db.add(candidate_profile)

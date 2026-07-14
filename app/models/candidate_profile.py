@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import DateTime, ForeignKey, Integer, String, func, Boolean
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -33,9 +33,15 @@ class CandidateProfile(Base):
     github_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
-    preferred_employment_types: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
-    preferred_work_formats: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    preferred_employment_types: Mapped[list[str] | None] = mapped_column(ARRAY(String),nullable=True)
+    preferred_work_formats: Mapped[list[str] | None] = mapped_column(ARRAY(String),nullable=True)
+    preferred_locations: Mapped[list[str] | None] = mapped_column(ARRAY(String),nullable=True)
+    desired_roles: Mapped[list[str] | None] = mapped_column(ARRAY(String),nullable=True)
+
     desired_salary_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    desired_salary_currency: Mapped[str | None] = mapped_column(String(3),nullable=True)
+
+    willing_to_relocate: Mapped[bool | None] = mapped_column(Boolean,nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
