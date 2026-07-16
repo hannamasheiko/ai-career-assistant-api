@@ -11,6 +11,28 @@ services:
       - "5435:5432"
     volumes:
       - ai_career_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_career_user -d ai_career_assistant_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ai_career_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-career-assistant-api
+    container_name: ai_career_assistant_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ai_career_user:ai_career_password@postgres:5432/ai_career_assistant_db
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   ai_career_postgres_data:
