@@ -389,7 +389,7 @@ PATCH /tracked-vacancies/interactions/{interaction_id}
 11. Відстеження application status і взаємодій із роботодавцем
 ```
 
-## Локальний запуск
+## Запуск застосунку
 
 ### Передумови
 
@@ -498,6 +498,22 @@ alembic downgrade -1
 
 ### 7. Запуск застосунку
 
+#### Через Docker
+
+Для запуску AI Career Assistant API та PostgreSQL виконайте:
+
+```bash
+docker compose up --build
+```
+
+Після запуску API буде доступний за адресою:
+
+```text
+http://localhost:8004
+```
+
+#### Локально
+
 ```bash
 uvicorn app.main:app --reload
 ```
@@ -512,22 +528,20 @@ http://127.0.0.1:8000
 
 FastAPI автоматично генерує інтерактивну OpenAPI-документацію.
 
-Swagger UI:
+При запуску через Docker Compose:
 
 ```text
-http://127.0.0.1:8000/docs
+Swagger UI:    http://localhost:8004/docs
+ReDoc:         http://localhost:8004/redoc
+OpenAPI schema: http://localhost:8004/openapi.json
 ```
 
-ReDoc:
+При локальному запуску:
 
 ```text
-http://127.0.0.1:8000/redoc
-```
-
-OpenAPI schema:
-
-```text
-http://127.0.0.1:8000/openapi.json
+Swagger UI:    http://127.0.0.1:8000/docs
+ReDoc:         http://127.0.0.1:8000/redoc
+OpenAPI schema: http://127.0.0.1:8000/openapi.json
 ```
 
 Protected endpoints можна тестувати у Swagger UI: виконайте login, скопіюйте отриманий access token і скористайтеся кнопкою **Authorize**.
