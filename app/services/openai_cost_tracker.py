@@ -10,6 +10,14 @@ MODEL_PRICING_USD_PER_1M_TOKENS = {
         "input": Decimal("0.40"),
         "output": Decimal("1.60"),
     },
+    "gpt-5.4-mini": {
+        "input": Decimal("0.75"),
+        "output": Decimal("4.50"),
+    },
+    "gpt-5.6-terra": {
+        "input": Decimal("2.50"),
+        "output": Decimal("15.00"),
+    },
 }
 
 
