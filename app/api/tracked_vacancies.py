@@ -208,7 +208,6 @@ async def create_match_analysis_endpoint(
             db=db,
             tracked_vacancy=tracked_vacancy,
             ai_model=settings.openai_model,
-            prompt_version="match_analysis_v1",
         )
     except RuntimeError as error:
         raise HTTPException(

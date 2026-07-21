@@ -9,6 +9,7 @@ from app.models.tracked_vacancy import TrackedVacancy
 from app.models.vacancy import Vacancy, VacancyAnalysis
 from app.schemas.ai_outputs import ParsedMatchAnalysis
 from app.models.candidate_profile import CandidateProfile
+from app.ai.prompts.match_analysis import MATCH_ANALYSIS_PROMPT_VERSION
 
 
 async def get_match_analysis_by_tracked_vacancy_id(
@@ -109,7 +110,6 @@ async def create_or_update_match_analysis(
     db: AsyncSession,
     tracked_vacancy: TrackedVacancy,
     ai_model: str,
-    prompt_version: str,
 ) -> MatchAnalysis:
     """Create or update match analysis for tracked vacancy."""
 
@@ -166,7 +166,7 @@ async def create_or_update_match_analysis(
             risk_points=parsed_match_analysis.risk_points,
             reasoning_summary=parsed_match_analysis.reasoning_summary,
             ai_model=ai_model,
-            prompt_version=prompt_version,
+            prompt_version=MATCH_ANALYSIS_PROMPT_VERSION,
         )
 
         db.add(match_analysis)
@@ -195,7 +195,7 @@ async def create_or_update_match_analysis(
             parsed_match_analysis.reasoning_summary
         )
         match_analysis.ai_model = ai_model
-        match_analysis.prompt_version = prompt_version
+        match_analysis.prompt_version = MATCH_ANALYSIS_PROMPT_VERSION
 
     await db.commit()
     await db.refresh(match_analysis)
