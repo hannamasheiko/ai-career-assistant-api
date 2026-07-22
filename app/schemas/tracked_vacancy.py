@@ -2,6 +2,12 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.tracked_vacancy_enums import (
+    TrackedVacancyDecision,
+    TrackedVacancyPriority,
+    TrackedVacancyStatus,
+)
+
 
 class TrackedVacancyCreate(BaseModel):
     """Schema for creating a tracked vacancy."""
@@ -9,9 +15,10 @@ class TrackedVacancyCreate(BaseModel):
     resume_document_id: int
     vacancy_id: int
 
-    status: str = Field(default="saved", max_length=100)
-    priority: str | None = Field(default=None, max_length=100)
-    decision: str | None = Field(default=None, max_length=100)
+    status: TrackedVacancyStatus = TrackedVacancyStatus.SAVED
+    priority: TrackedVacancyPriority = TrackedVacancyPriority.LOW
+    decision: TrackedVacancyDecision = TrackedVacancyDecision.INTERESTED
+
     notes: str | None = None
 
     applied_at: datetime | None = None
@@ -22,9 +29,10 @@ class TrackedVacancyCreate(BaseModel):
 class TrackedVacancyUpdate(BaseModel):
     """Schema for updating a tracked vacancy."""
 
-    status: str | None = Field(default=None, max_length=100)
-    priority: str | None = Field(default=None, max_length=100)
-    decision: str | None = Field(default=None, max_length=100)
+    status: TrackedVacancyStatus | None = None
+    priority: TrackedVacancyPriority | None = None
+    decision: TrackedVacancyDecision | None = None
+
     notes: str | None = None
 
     applied_at: datetime | None = None
@@ -40,9 +48,10 @@ class TrackedVacancyResponse(BaseModel):
     resume_document_id: int
     vacancy_id: int
 
-    status: str
-    priority: str | None
-    decision: str | None
+    status: TrackedVacancyStatus
+    priority: TrackedVacancyPriority
+    decision: TrackedVacancyDecision
+
     notes: str | None
 
     applied_at: datetime | None
