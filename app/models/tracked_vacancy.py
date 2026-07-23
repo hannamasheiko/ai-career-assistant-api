@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, String, Text, func, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -25,6 +25,38 @@ class TrackedVacancy(Base):
             "vacancy_id",
             name="uq_tracked_vacancies_resume_document_id_vacancy_id",
         ),
+        CheckConstraint(
+            """
+            status IN (
+                'saved',
+                'analyzed',
+                'resume_sent',
+                'recruiter_contact',
+                'screening',
+                'interview',
+                'test_task',
+                'offer',
+                'rejected',
+                'discarded',
+                'closed'
+            )
+            """,
+            name="ck_tracked_vacancies_status",
+        ),
+        CheckConstraint(
+            "priority IN ('low', 'medium', 'high')",
+            name="ck_tracked_vacancies_priority",
+        ),
+        CheckConstraint(
+            """
+            decision IN (
+                'interested',
+                'consider_later',
+                'not_interested'
+            )
+            """,
+            name="ck_tracked_vacancies_decision",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -38,9 +70,24 @@ class TrackedVacancy(Base):
         nullable=False,
     )
 
-    status: Mapped[str] = mapped_column(String(100), server_default="saved", nullable=False)
-    priority: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    decision: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(100),
+        server_default="saved",
+        nullable=False,
+    )
+
+    priority: Mapped[str] = mapped_column(
+        String(100),
+        server_default="low",
+        nullable=False,
+    )
+
+    decision: Mapped[str] = mapped_column(
+        String(100),
+        server_default="interested",
+        nullable=False,
+    )
+
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
