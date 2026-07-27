@@ -6,11 +6,15 @@ from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.vacancy import (
     VacancyAnalysisIngestionResponse,
+    VacancyAnalysisResponse,
     VacancyIngestionResponse,
+    VacancyResponse,
 )
 from app.services.vacancy_service import (
     create_vacancy_analysis,
     create_vacancy_from_text,
+    get_vacancy_by_id,
+    get_latest_vacancy_analysis,
 )
 
 router = APIRouter(
@@ -57,6 +61,30 @@ async def create_vacancy_from_plain_text(
         analysis=analysis,
     )
 
+@router.get(
+    "/{vacancy_id}",
+    response_model=VacancyResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_vacancy(
+    vacancy_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a vacancy by id."""
+
+    vacancy = await get_vacancy_by_id(
+        db=db,
+        vacancy_id=vacancy_id,
+    )
+
+    if vacancy is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vacancy not found",
+        )
+
+    return vacancy
 
 @router.post(
     "/{vacancy_id}/analysis",
@@ -91,3 +119,39 @@ async def generate_vacancy_analysis(
     return VacancyAnalysisIngestionResponse(
         analysis=analysis,
     )
+
+@router.get(
+    "/{vacancy_id}/analysis",
+    response_model=VacancyAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_vacancy_analysis(
+    vacancy_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the latest AI analysis for a vacancy."""
+
+    vacancy = await get_vacancy_by_id(
+        db=db,
+        vacancy_id=vacancy_id,
+    )
+
+    if vacancy is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vacancy not found",
+        )
+
+    analysis = await get_latest_vacancy_analysis(
+        db=db,
+        vacancy_id=vacancy_id,
+    )
+
+    if analysis is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vacancy analysis not found",
+        )
+
+    return analysis

@@ -80,3 +80,30 @@ async def create_vacancy_analysis(
     await db.refresh(vacancy_analysis)
 
     return vacancy_analysis
+
+async def get_vacancy_by_id(
+    db: AsyncSession,
+    vacancy_id: int,
+) -> Vacancy | None:
+    """Get vacancy by id."""
+
+    result = await db.execute(
+        select(Vacancy).where(Vacancy.id == vacancy_id)
+    )
+
+    return result.scalar_one_or_none()
+
+async def get_latest_vacancy_analysis(
+    db: AsyncSession,
+    vacancy_id: int,
+) -> VacancyAnalysis | None:
+    """Get the latest AI analysis for a vacancy."""
+
+    result = await db.execute(
+        select(VacancyAnalysis)
+        .where(VacancyAnalysis.vacancy_id == vacancy_id)
+        .order_by(VacancyAnalysis.created_at.desc())
+        .limit(1)
+    )
+
+    return result.scalar_one_or_none()
