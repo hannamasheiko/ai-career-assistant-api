@@ -1,13 +1,17 @@
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.interaction_enums import (
+    InteractionDirection,
+    InteractionType,
+)
 
 
 class InteractionCreate(BaseModel):
     """Schema for creating an interaction related to a tracked vacancy."""
 
-    interaction_type: str = Field(..., max_length=100)
-    direction: str | None = Field(default=None, max_length=50)
+    interaction_type: InteractionType
+    direction: InteractionDirection | None = None
 
     message_text: str | None = None
     summary: str | None = None
