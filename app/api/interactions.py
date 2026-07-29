@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -16,6 +16,11 @@ from app.services.interaction_service import (
     get_tracked_vacancy_for_interaction,
     update_interaction,
 )
+from datetime import datetime
+from app.schemas.interaction_enums import (
+    InteractionDirection,
+    InteractionType,
+)
 
 
 router = APIRouter(
@@ -30,11 +35,23 @@ router = APIRouter(
 )
 async def create_interaction_endpoint(
     tracked_vacancy_id: int,
-    data: InteractionCreate,
+    interaction_type: InteractionType = Form(...),
+    direction: InteractionDirection | None = Form(default=None),
+    message_text: str | None = Form(default=None),
+    summary: str | None = Form(default=None),
+    occurred_at: datetime | None = Form(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> InteractionResponse:
     """Create interaction for tracked vacancy."""
+
+    data = InteractionCreate(
+        interaction_type=interaction_type,
+        direction=direction,
+        message_text=message_text,
+        summary=summary,
+        occurred_at=occurred_at,
+    )
 
     tracked_vacancy = await get_tracked_vacancy_for_interaction(
         db=db,
