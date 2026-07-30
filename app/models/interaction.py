@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, func, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -14,6 +14,33 @@ class Interaction(Base):
     """Communication or event related to a tracked vacancy."""
 
     __tablename__ = "interactions"
+
+    __table_args__ = (
+        CheckConstraint(
+            """
+            interaction_type IN (
+                'resume_sent',
+                'message',
+                'call',
+                'screening_questions',
+                'interview_invitation',
+                'hr_interview',
+                'technical_interview',
+                'final_interview',
+                'test_task',
+                'feedback',
+                'offer_discussion',
+                'offer',
+                'rejection'
+            )
+            """,
+            name="ck_interactions_interaction_type",
+        ),
+        CheckConstraint(
+            "direction IN ('incoming', 'outgoing')",
+            name="ck_interactions_direction",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
