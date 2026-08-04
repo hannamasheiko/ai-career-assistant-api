@@ -1,4 +1,8 @@
+import logging
 from decimal import Decimal
+
+
+logger = logging.getLogger(__name__)
 
 
 MODEL_PRICING_USD_PER_1M_TOKENS = {
@@ -48,13 +52,13 @@ def calculate_openai_cost(
     }
 
 
-def print_openai_usage(
+def log_openai_usage(
     model: str,
     input_tokens: int,
     output_tokens: int,
     total_tokens: int,
 ) -> None:
-    """Print OpenAI token usage and estimated cost."""
+    """Log OpenAI token usage and estimated cost."""
 
     cost = calculate_openai_cost(
         model=model,
@@ -62,17 +66,29 @@ def print_openai_usage(
         output_tokens=output_tokens,
     )
 
-    print("========== OPENAI TOKEN USAGE ==========")
-    print(f"Model: {model}")
-    print(f"Input tokens: {input_tokens}")
-    print(f"Output tokens: {output_tokens}")
-    print(f"Total tokens: {total_tokens}")
-
-    if cost["total_cost"] is None:
-        print("Estimated cost: unknown pricing for this model")
-    else:
-        print(f"Estimated input cost: ${cost['input_cost']:.6f}")
-        print(f"Estimated output cost: ${cost['output_cost']:.6f}")
-        print(f"Estimated total cost: ${cost['total_cost']:.6f}")
-
-    print("========================================")
+    logger.info(
+        "OpenAI API usage",
+        extra={
+            "event": "openai_api_usage",
+            "model": model,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "input_cost_usd": (
+                str(cost["input_cost"])
+                if cost["input_cost"] is not None
+                else None
+            ),
+            "output_cost_usd": (
+                str(cost["output_cost"])
+                if cost["output_cost"] is not None
+                else None
+            ),
+            "total_cost_usd": (
+                str(cost["total_cost"])
+                if cost["total_cost"] is not None
+                else None
+            ),
+            "pricing_available": cost["total_cost"] is not None,
+        },
+    )

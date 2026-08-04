@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI
 
 from app.core.config import settings
 from app.schemas.ai_outputs import ParsedVacancyDetails
-from app.services.openai_cost_tracker import print_openai_usage
+from app.services.openai_cost_tracker import log_openai_usage
 
 
 async def parse_vacancy_chain(raw_text: str) -> ParsedVacancyDetails:
@@ -204,7 +204,7 @@ cleaned_text:
         output_tokens = usage_metadata.get("output_tokens", 0)
         total_tokens = usage_metadata.get("total_tokens", 0)
 
-        print_openai_usage(
+        log_openai_usage(
             model=settings.openai_model,
             input_tokens=input_tokens,
             output_tokens=output_tokens,

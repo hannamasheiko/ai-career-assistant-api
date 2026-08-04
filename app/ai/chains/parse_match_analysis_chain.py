@@ -16,7 +16,7 @@ from app.models.resume import ResumeSection
 from app.models.resume_analysis import ResumeAnalysis
 from app.models.vacancy import Vacancy, VacancyAnalysis
 from app.schemas.ai_outputs import ParsedMatchAnalysis
-from app.services.openai_cost_tracker import print_openai_usage
+from app.services.openai_cost_tracker import log_openai_usage
 
 from app.ai.prompts.match_analysis import (
     MATCH_ANALYSIS_PROMPT_VERSION,
@@ -127,7 +127,7 @@ async def parse_match_analysis_chain(
             0,
         )
 
-        print_openai_usage(
+        log_openai_usage(
             model=settings.openai_model,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
