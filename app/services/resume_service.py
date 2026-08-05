@@ -8,6 +8,7 @@ from app.models.candidate_profile import CandidateProfile
 from app.models.resume import ResumeDocument, ResumeSection
 from app.models.resume_analysis import ResumeAnalysis
 from app.services.experience_calculator import calculate_years_of_experience
+from app.ai.prompts.resume_parsing import RESUME_PARSING_PROMPT_VERSION
 
 
 async def create_resume_from_text(
@@ -50,7 +51,7 @@ async def create_resume_from_text(
         education_summary=parsed_analysis.education_summary,
         languages=parsed_analysis.languages,
         ai_model=settings.openai_model,
-        prompt_version="resume_parsing_v1",
+        prompt_version=RESUME_PARSING_PROMPT_VERSION,
     )
     db.add(resume_analysis)
 
