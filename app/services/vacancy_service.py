@@ -4,11 +4,12 @@ from app.ai.chains.parse_vacancy_chain import parse_vacancy_chain
 from app.models.vacancy import Vacancy, VacancyAnalysis
 
 from sqlalchemy import select
-from app.ai.chains.analyze_vacancy_chain import (
-    VACANCY_ANALYSIS_PROMPT_VERSION,
-    analyze_vacancy_chain,
-)
 from app.core.config import settings
+
+from app.ai.chains.analyze_vacancy_chain import analyze_vacancy_chain
+from app.ai.prompts.vacancy_analysis import (
+    VACANCY_ANALYSIS_PROMPT_VERSION,
+)
 
 
 async def create_vacancy_from_text(
