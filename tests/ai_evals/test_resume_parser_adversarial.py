@@ -193,3 +193,49 @@ async def test_resume_parser_handles_conflicting_english_levels():
         for language in normalized_languages
     )
 
+@pytest.mark.ai_eval
+@pytest.mark.anyio
+async def test_parses_overlapping_and_current_work_periods() -> None:
+    resume_text = """
+    ДОСВІД РОБОТИ
+
+    Backend Developer, Company A
+    01.2022 – дотепер
+    Комерційна розробка backend-сервісів на Python.
+
+    Freelance Python Developer
+    06.2022 – 03.2023
+    Комерційна розробка API для клієнта.
+    """
+
+    result = await parse_resume_chain(resume_text)
+
+    assert len(result.work_experience_periods) == 2
+
+    current_period = next(
+        (period
+        for period in result.work_experience_periods
+        if period.is_current
+        ), None
+    )
+    assert current_period is not None
+
+    completed_period = next(
+        (period
+        for period in result.work_experience_periods
+        if not period.is_current
+        ), None
+    )
+    assert completed_period is not None
+
+    assert current_period.start_month == 1
+    assert current_period.start_year == 2022
+    assert current_period.end_month is None
+    assert current_period.end_year is None
+    assert current_period.is_commercial is True
+
+    assert completed_period.start_month == 6
+    assert completed_period.start_year == 2022
+    assert completed_period.end_month == 3
+    assert completed_period.end_year == 2023
+    assert completed_period.is_commercial is True
