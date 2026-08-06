@@ -11,6 +11,10 @@ from app.models.resume import ResumeDocument
 from app.models.tracked_vacancy import TrackedVacancy
 from app.schemas.generated_content import GeneratedContentGenerateRequest, GeneratedContentUpdate
 from app.schemas.ai_outputs import ParsedGeneratedContent
+from app.ai.prompts.content_generation import (
+    GENERATED_CONTENT_PROMPT_VERSION,
+)
+from app.core.config import settings
 
 
 async def get_tracked_vacancy_for_generated_content(
@@ -168,8 +172,6 @@ async def generate_and_save_content(
     db: AsyncSession,
     tracked_vacancy: TrackedVacancy,
     data: GeneratedContentGenerateRequest,
-    ai_model: str,
-    prompt_version: str,
 ) -> GeneratedContent:
     """Generate AI content and save it to the database."""
 
@@ -212,8 +214,8 @@ async def generate_and_save_content(
             data=data,
         ),
         generated_text=parsed_generated_content.generated_text,
-        ai_model=ai_model,
-        prompt_version=prompt_version,
+        ai_model=settings.openai_model,
+        prompt_version=GENERATED_CONTENT_PROMPT_VERSION,
     )
 
     db.add(generated_content)

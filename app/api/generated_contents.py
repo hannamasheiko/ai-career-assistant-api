@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
@@ -54,8 +53,6 @@ async def generate_content_endpoint(
             db=db,
             tracked_vacancy=tracked_vacancy,
             data=data,
-            ai_model=settings.openai_model,
-            prompt_version="generated_content_cover_letter_v1",
         )
     except ValueError as error:
         raise HTTPException(
