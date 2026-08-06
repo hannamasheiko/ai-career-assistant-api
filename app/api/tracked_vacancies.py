@@ -19,7 +19,6 @@ from app.services.tracked_vacancy_service import (
     update_tracked_vacancy,
 )
 
-from app.core.config import settings
 from app.schemas.match_analysis import MatchAnalysisResponse
 from app.services.match_analysis_service import (
     create_or_update_match_analysis,
@@ -193,7 +192,6 @@ async def create_match_analysis_endpoint(
         match_analysis = await create_or_update_match_analysis(
             db=db,
             tracked_vacancy=tracked_vacancy,
-            ai_model=settings.openai_model,
         )
     except RuntimeError as error:
         raise HTTPException(
