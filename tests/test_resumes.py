@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
+from app.core.exceptions import AIServiceError
+from fastapi import status
 
 
 VALID_RESUME_TEXT = (
@@ -282,7 +284,7 @@ def test_create_resume_rejects_too_short_text(client):
     assert response.status_code == 422
 
 
-def test_create_resume_returns_500_when_service_fails(
+def test_create_resume_returns_503_when_ai_service_fails(
     client,
     monkeypatch,
 ):
@@ -296,7 +298,7 @@ def test_create_resume_returns_500_when_service_fails(
         raw_text,
         file_name,
     ):
-        raise RuntimeError("OpenAI resume parsing failed")
+        raise AIServiceError("OpenAI resume parsing failed")
 
     monkeypatch.setattr(
         "app.api.resumes.create_resume_from_text",
@@ -312,5 +314,7 @@ def test_create_resume_returns_500_when_service_fails(
         content=VALID_RESUME_TEXT,
     )
 
-    assert response.status_code == 500
-    assert response.json()["detail"] == "OpenAI resume parsing failed"
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert response.json() == {
+        "detail": "AI service is temporarily unavailable. Please try again later."
+    }

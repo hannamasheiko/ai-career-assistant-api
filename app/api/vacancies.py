@@ -36,25 +36,18 @@ async def create_vacancy_from_plain_text(
 ):
     """Create vacancy from plain text and optionally generate AI vacancy analysis."""
 
-    try:
-        vacancy = await create_vacancy_from_text(
+    vacancy = await create_vacancy_from_text(
+        db=db,
+        raw_text=raw_text,
+    )
+
+    analysis = None
+
+    if analyze:
+        analysis = await create_vacancy_analysis(
             db=db,
-            raw_text=raw_text,
+            vacancy_id=vacancy.id,
         )
-
-        analysis = None
-
-        if analyze:
-            analysis = await create_vacancy_analysis(
-                db=db,
-                vacancy_id=vacancy.id,
-            )
-
-    except RuntimeError as error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(error),
-        ) from error
 
     return VacancyIngestionResponse(
         vacancy=vacancy,
@@ -107,12 +100,6 @@ async def generate_vacancy_analysis(
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(error),
-        ) from error
-
-    except RuntimeError as error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
         ) from error
 

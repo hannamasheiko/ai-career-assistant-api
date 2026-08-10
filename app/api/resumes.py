@@ -46,18 +46,14 @@ async def create_resume_from_plain_text(
             detail="Candidate profile not found. Create your profile first.",
         )
 
-    try:
-        resume_document, resume_analysis, resume_sections = await create_resume_from_text(
-            db=db,
-            candidate_profile=candidate_profile,
-            raw_text=raw_text,
-            file_name=file_name,
+
+    resume_document, resume_analysis, resume_sections = await create_resume_from_text(
+        db=db,
+        candidate_profile=candidate_profile,
+        raw_text=raw_text,
+        file_name=file_name,
         )
-    except RuntimeError as error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(error),
-        ) from error
+
 
     return ResumeIngestionResponse(
         resume_document=resume_document,

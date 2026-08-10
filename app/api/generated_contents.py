@@ -59,11 +59,6 @@ async def generate_content_endpoint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
         ) from error
-    except RuntimeError as error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(error),
-        ) from error
 
     return generated_content
 

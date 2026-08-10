@@ -10,6 +10,7 @@ from app.models.vacancy import Vacancy, VacancyAnalysis
 from app.schemas.ai_outputs import ParsedMatchAnalysis
 from app.core.config import settings
 from app.ai.prompts.match_analysis import MATCH_ANALYSIS_PROMPT_VERSION
+from app.core.exceptions import AIPrerequisiteError
 
 
 async def get_match_analysis_by_tracked_vacancy_id(
@@ -52,7 +53,7 @@ def get_latest_vacancy_analysis(
     """Get the latest available AI analysis for a vacancy."""
 
     if not vacancy.analyses:
-        raise RuntimeError(
+        raise AIPrerequisiteError(
             "Vacancy analysis is required before match analysis"
         )
 
@@ -123,7 +124,7 @@ async def create_or_update_match_analysis(
     )
 
     if resume_analysis is None:
-        raise RuntimeError(
+        raise AIPrerequisiteError(
             "Resume analysis is required before match analysis"
         )
 

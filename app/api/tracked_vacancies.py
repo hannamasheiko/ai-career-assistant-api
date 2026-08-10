@@ -188,16 +188,10 @@ async def create_match_analysis_endpoint(
             detail="Tracked vacancy not found.",
         )
 
-    try:
-        match_analysis = await create_or_update_match_analysis(
-            db=db,
-            tracked_vacancy=tracked_vacancy,
-        )
-    except RuntimeError as error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(error),
-        ) from error
+    match_analysis = await create_or_update_match_analysis(
+        db=db,
+        tracked_vacancy=tracked_vacancy,
+    )
 
     return match_analysis
 

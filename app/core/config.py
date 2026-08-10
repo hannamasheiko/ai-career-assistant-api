@@ -10,6 +10,8 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    openai_timeout: float = 90.0
+    openai_max_retries: int = 2
 
     secret_key: str
     algorithm: str = "HS256"

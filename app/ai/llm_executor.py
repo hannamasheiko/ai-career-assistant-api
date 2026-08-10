@@ -7,6 +7,23 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.services.openai_cost_tracker import log_openai_usage
 
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    InternalServerError,
+    RateLimitError,
+)
+from app.core.exceptions import (
+    AIOutputValidationError,
+    AIRateLimitError,
+    AIServiceError,
+    AITimeoutError,
+)
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 StructuredOutputT = TypeVar(
     "StructuredOutputT",
@@ -29,6 +46,8 @@ async def invoke_structured_llm(
         model=settings.openai_model,
         api_key=settings.openai_api_key,
         temperature=temperature,
+        timeout=settings.openai_timeout,
+        max_retries=settings.openai_max_retries,
     )
 
     structured_llm = llm.with_structured_output(
@@ -37,14 +56,31 @@ async def invoke_structured_llm(
     )
 
     chain = prompt | structured_llm
-    result = await chain.ainvoke(input_data)
+    try:
+        result = await chain.ainvoke(input_data)
+
+    except APITimeoutError as exc:
+        logger.exception("OpenAI request timed out.")
+        raise AITimeoutError("AI request timed out.") from exc
+
+    except RateLimitError as exc:
+        logger.exception("OpenAI rate limit exceeded.")
+        raise AIRateLimitError("AI rate limit exceeded.") from exc
+
+    except (APIConnectionError, InternalServerError) as exc:
+        logger.exception("OpenAI service is temporarily unavailable.")
+        raise AIServiceError("AI service is temporarily unavailable.") from exc
 
     parsed_result = result["parsed"]
     raw_response = result["raw"]
 
     if parsed_result is None:
         parsing_error = result.get("parsing_error")
-        raise RuntimeError(error_message) from parsing_error
+        logger.error(
+            "AI output validation failed: %s",
+            parsing_error,
+        )
+        raise AIOutputValidationError(error_message) from parsing_error
 
     usage_metadata = getattr(raw_response, "usage_metadata", None)
 

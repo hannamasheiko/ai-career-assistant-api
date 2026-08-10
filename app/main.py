@@ -10,12 +10,14 @@ from app.api.vacancies import router as vacancies_router
 from app.api.tracked_vacancies import router as tracked_vacancies_router
 from app.api.generated_contents import router as generated_contents_router
 from app.api import interactions
+from app.core.exception_handlers import register_exception_handlers
 
 
 app = FastAPI(
     title=settings.project_name,
     version=settings.api_version,
 )
+register_exception_handlers(app)
 
 @app.get("/")
 def root():

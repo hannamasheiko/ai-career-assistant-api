@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 import app.ai.llm_executor as llm_executor_module
 from app.ai.llm_executor import invoke_structured_llm
+from app.core.exceptions import AIOutputValidationError
 
 
 pytestmark = pytest.mark.anyio
@@ -97,6 +98,8 @@ async def test_invoke_structured_llm_returns_parsed_result(
         model="test-model",
         api_key="test-api-key",
         temperature=0.2,
+        timeout=llm_executor_module.settings.openai_timeout,
+        max_retries=llm_executor_module.settings.openai_max_retries,
     )
     llm_mock.with_structured_output.assert_called_once_with(
         StructuredOutputFixture,
@@ -164,7 +167,7 @@ async def test_invoke_structured_llm_raises_when_parsing_fails(
     )
 
     with pytest.raises(
-        RuntimeError,
+        AIOutputValidationError,
         match="Failed to parse test output",
     ) as exc_info:
         await invoke_structured_llm(
