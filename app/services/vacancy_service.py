@@ -16,7 +16,7 @@ async def create_vacancy_from_text(
     db: AsyncSession,
     raw_text: str,
 ) -> Vacancy:
-    """Create vacancy from copied vacancy page text."""
+    """Create a vacancy in the shared global catalog from copied page text."""
 
     parsed_vacancy = await parse_vacancy_chain(
         raw_text=raw_text,
@@ -86,7 +86,7 @@ async def get_vacancy_by_id(
     db: AsyncSession,
     vacancy_id: int,
 ) -> Vacancy | None:
-    """Get vacancy by id."""
+    """Get a vacancy from the shared global catalog by id."""
 
     result = await db.execute(
         select(Vacancy).where(Vacancy.id == vacancy_id)

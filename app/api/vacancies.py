@@ -34,7 +34,7 @@ async def create_vacancy_from_plain_text(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create vacancy from plain text and optionally generate AI vacancy analysis."""
+    """Create a shared catalog vacancy and optionally generate AI analysis."""
 
     vacancy = await create_vacancy_from_text(
         db=db,
@@ -64,7 +64,7 @@ async def get_vacancy(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a vacancy by id."""
+    """Return a shared catalog vacancy without user-specific ownership."""
 
     vacancy = await get_vacancy_by_id(
         db=db,
@@ -89,7 +89,7 @@ async def generate_vacancy_analysis(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Generate AI analysis for an existing vacancy."""
+    """Generate AI analysis for an existing shared catalog vacancy."""
 
     try:
         analysis = await create_vacancy_analysis(
@@ -117,7 +117,7 @@ async def get_vacancy_analysis(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get the latest AI analysis for a vacancy."""
+    """Get the latest AI analysis for a shared catalog vacancy."""
 
     vacancy = await get_vacancy_by_id(
         db=db,

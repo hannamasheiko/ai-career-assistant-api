@@ -171,3 +171,28 @@ def test_get_vacancy_requires_authentication(client):
     response = client.get("/vacancies/1")
 
     assert response.status_code == 401
+
+
+def test_vacancy_is_visible_to_another_authenticated_user(
+    client,
+    monkeypatch,
+):
+    first_user = create_test_user(client)
+    first_user_headers = get_auth_headers(client, first_user)
+
+    created_vacancy = create_test_vacancy(
+        client,
+        first_user_headers,
+        monkeypatch,
+    )
+
+    second_user = create_test_user(client)
+    second_user_headers = get_auth_headers(client, second_user)
+
+    response = client.get(
+        f"/vacancies/{created_vacancy['id']}",
+        headers=second_user_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == created_vacancy

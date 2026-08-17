@@ -12,7 +12,12 @@ if TYPE_CHECKING:
 
 
 class Vacancy(Base):
-    """Vacancy with raw text, cleaned text, and basic job information."""
+    """
+    Global vacancy catalog entry shared between authenticated users.
+
+    Vacancy intentionally has no user ownership. User-specific state and
+    authorization are represented by TrackedVacancy.
+    """
 
     __tablename__ = "vacancies"
 
