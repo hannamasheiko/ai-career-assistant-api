@@ -104,7 +104,7 @@ async def create_tracked_vacancy(
         decision=data.decision,
         notes=data.notes,
         applied_at=data.applied_at,
-        last_contact_at=data.last_contact_at,
+        closed_at=data.closed_at,
         next_action_at=data.next_action_at,
     )
 

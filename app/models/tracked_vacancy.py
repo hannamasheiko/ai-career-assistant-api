@@ -91,7 +91,7 @@ class TrackedVacancy(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    last_contact_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     next_action_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

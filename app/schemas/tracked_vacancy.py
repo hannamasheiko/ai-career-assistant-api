@@ -22,7 +22,7 @@ class TrackedVacancyCreate(BaseModel):
     notes: str | None = None
 
     applied_at: datetime | None = None
-    last_contact_at: datetime | None = None
+    closed_at: datetime | None = None
     next_action_at: datetime | None = None
 
 
@@ -36,7 +36,7 @@ class TrackedVacancyUpdate(BaseModel):
     notes: str | None = None
 
     applied_at: datetime | None = None
-    last_contact_at: datetime | None = None
+    closed_at: datetime | None = None
     next_action_at: datetime | None = None
 
 
@@ -55,11 +55,10 @@ class TrackedVacancyResponse(BaseModel):
     notes: str | None
 
     applied_at: datetime | None
-    last_contact_at: datetime | None
+    closed_at: datetime | None
     next_action_at: datetime | None
 
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
-

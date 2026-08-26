@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from app.schemas.ai_outputs import (
     ParsedResume,
@@ -360,6 +361,7 @@ def test_update_tracked_vacancy(client, monkeypatch):
         "priority": "high",
         "decision": "interested",
         "notes": "Applied through company website.",
+        "closed_at": "2026-08-26T12:00:00+00:00",
     }
 
     response = client.patch(
@@ -376,6 +378,9 @@ def test_update_tracked_vacancy(client, monkeypatch):
     assert response_data["priority"] == "high"
     assert response_data["decision"] == "interested"
     assert response_data["notes"] == "Applied through company website."
+    assert datetime.fromisoformat(response_data["closed_at"]) == (
+        datetime.fromisoformat(update_data["closed_at"])
+    )
 
     get_response = client.get(
         f"/tracked-vacancies/{tracked_vacancy['id']}",
@@ -387,4 +392,7 @@ def test_update_tracked_vacancy(client, monkeypatch):
     assert get_response.json()["priority"] == "high"
     assert get_response.json()["notes"] == (
         "Applied through company website."
+    )
+    assert datetime.fromisoformat(get_response.json()["closed_at"]) == (
+        datetime.fromisoformat(update_data["closed_at"])
     )

@@ -193,7 +193,7 @@ def create_test_interaction(
     return response.json()
 
 
-def test_create_interaction_updates_last_contact_at(client, monkeypatch):
+def test_create_interaction(client, monkeypatch):
     auth_headers, tracked_vacancy = prepare_interaction_data(
         client,
         monkeypatch,
@@ -222,19 +222,12 @@ def test_create_interaction_updates_last_contact_at(client, monkeypatch):
         "Hello, I am interested in this role."
     )
     assert interaction["summary"] == "Sent an introductory message."
+    assert datetime.fromisoformat(interaction["occurred_at"]) == (
+        datetime.fromisoformat(occurred_at)
+    )
     assert interaction["id"] is not None
     assert interaction["created_at"] is not None
     assert interaction["updated_at"] is not None
-
-    tracked_response = client.get(
-        f"/tracked-vacancies/{tracked_vacancy['id']}",
-        headers=auth_headers,
-    )
-
-    assert tracked_response.status_code == 200
-    assert datetime.fromisoformat(
-        tracked_response.json()["last_contact_at"],
-    ) == datetime.fromisoformat(occurred_at)
 
 
 def test_create_interaction_requires_authentication(client):

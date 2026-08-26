@@ -93,9 +93,6 @@ async def create_interaction(
 
     db.add(interaction)
 
-    if data.occurred_at is not None:
-        tracked_vacancy.last_contact_at = data.occurred_at
-
     await db.commit()
     await db.refresh(interaction)
 
@@ -118,4 +115,3 @@ async def update_interaction(
     await db.refresh(interaction)
 
     return interaction
-
