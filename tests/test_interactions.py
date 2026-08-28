@@ -1313,3 +1313,299 @@ def test_interview_events_do_not_change_ineligible_statuses(
 
     assert tracked_response.status_code == 200
     assert tracked_response.json()["status"] == initial_status
+
+
+@pytest.mark.parametrize(
+    ("initial_status", "direction", "expected_status"),
+    [
+        pytest.param(
+            "resume_sent",
+            "incoming",
+            "test_task",
+            id="test-task-after-resume-sent",
+        ),
+        pytest.param(
+            "recruiter_contact",
+            "incoming",
+            "test_task",
+            id="test-task-after-recruiter-contact",
+        ),
+        pytest.param(
+            "screening",
+            "incoming",
+            "test_task",
+            id="test-task-after-screening",
+        ),
+        pytest.param(
+            "interview",
+            "incoming",
+            "test_task",
+            id="test-task-after-interview",
+        ),
+        pytest.param(
+            "interview",
+            "outgoing",
+            "interview",
+            id="outgoing-test-task-keeps-status",
+        ),
+        pytest.param(
+            "interview",
+            None,
+            "interview",
+            id="test-task-without-direction-keeps-status",
+        ),
+        pytest.param(
+            "offer",
+            "incoming",
+            "offer",
+            id="test-task-does-not-roll-back-offer",
+        ),
+    ],
+)
+def test_test_task_interactions_update_only_eligible_statuses(
+    client,
+    monkeypatch,
+    initial_status,
+    direction,
+    expected_status,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    unchanged_fields = {
+        "priority": "high",
+        "decision": "consider_later",
+        "applied_at": "2026-08-10T09:00:00+00:00",
+        "closed_at": "2026-08-25T09:00:00+00:00",
+        "next_action_at": "2026-08-30T09:00:00+00:00",
+    }
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={
+            "status": initial_status,
+            **unchanged_fields,
+        },
+    )
+    assert update_response.status_code == 200
+    interaction_data = {
+        "interaction_type": "test_task",
+        "summary": "Test task event.",
+        "occurred_at": "2026-08-20T10:00:00+00:00",
+    }
+    if direction is not None:
+        interaction_data["direction"] = direction
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data=interaction_data,
+    )
+
+    assert interaction_response.status_code == 201
+    assert interaction_response.json()["interaction_type"] == "test_task"
+    assert interaction_response.json()["direction"] == direction
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    tracked_data = tracked_response.json()
+    assert tracked_data["status"] == expected_status
+    assert tracked_data["priority"] == unchanged_fields["priority"]
+    assert tracked_data["decision"] == unchanged_fields["decision"]
+    for field_name in (
+        "applied_at",
+        "closed_at",
+        "next_action_at",
+    ):
+        assert datetime.fromisoformat(tracked_data[field_name]) == (
+            datetime.fromisoformat(unchanged_fields[field_name])
+        )
+
+
+@pytest.mark.parametrize(
+    ("initial_status", "expected_status"),
+    [
+        pytest.param("resume_sent", "offer", id="offer-after-resume-sent"),
+        pytest.param(
+            "recruiter_contact",
+            "offer",
+            id="offer-after-recruiter-contact",
+        ),
+        pytest.param("screening", "offer", id="offer-after-screening"),
+        pytest.param("interview", "offer", id="offer-after-interview"),
+        pytest.param("test_task", "offer", id="offer-after-test-task"),
+        pytest.param("offer", "offer", id="revised-offer-keeps-status"),
+        pytest.param(
+            "saved",
+            "saved",
+            id="offer-does-not-skip-application",
+        ),
+    ],
+)
+def test_incoming_offer_updates_only_eligible_statuses(
+    client,
+    monkeypatch,
+    initial_status,
+    expected_status,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    unchanged_fields = {
+        "priority": "high",
+        "decision": "consider_later",
+        "applied_at": "2026-08-10T09:00:00+00:00",
+        "closed_at": "2026-08-25T09:00:00+00:00",
+        "next_action_at": "2026-08-30T09:00:00+00:00",
+    }
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={
+            "status": initial_status,
+            **unchanged_fields,
+        },
+    )
+    assert update_response.status_code == 200
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data={
+            "interaction_type": "offer",
+            "direction": "incoming",
+            "summary": "Employer sent an offer.",
+            "occurred_at": "2026-08-20T10:00:00+00:00",
+        },
+    )
+
+    assert interaction_response.status_code == 201
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    tracked_data = tracked_response.json()
+    assert tracked_data["status"] == expected_status
+    assert tracked_data["priority"] == unchanged_fields["priority"]
+    assert tracked_data["decision"] == unchanged_fields["decision"]
+    for field_name in (
+        "applied_at",
+        "closed_at",
+        "next_action_at",
+    ):
+        assert datetime.fromisoformat(tracked_data[field_name]) == (
+            datetime.fromisoformat(unchanged_fields[field_name])
+        )
+
+
+@pytest.mark.parametrize("direction", ["outgoing", None])
+def test_offer_rejects_non_incoming_direction(
+    client,
+    monkeypatch,
+    direction,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={"status": "interview"},
+    )
+    assert update_response.status_code == 200
+    interaction_data = {
+        "interaction_type": "offer",
+        "occurred_at": "2026-08-20T10:00:00+00:00",
+    }
+    if direction is not None:
+        interaction_data["direction"] = direction
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data=interaction_data,
+    )
+
+    assert interaction_response.status_code == 400
+    assert interaction_response.json()["detail"] == (
+        "An offer interaction must have incoming direction."
+    )
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+    interactions_response = client.get(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    assert tracked_response.json()["status"] == "interview"
+    assert interactions_response.status_code == 200
+    assert interactions_response.json() == []
+
+
+@pytest.mark.parametrize(
+    "terminal_status",
+    ["rejected", "discarded", "closed"],
+)
+def test_offer_does_not_overwrite_terminal_status(
+    client,
+    monkeypatch,
+    terminal_status,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={"status": terminal_status},
+    )
+    assert update_response.status_code == 200
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data={
+            "interaction_type": "offer",
+            "direction": "incoming",
+            "occurred_at": "2026-08-20T10:00:00+00:00",
+        },
+    )
+
+    assert interaction_response.status_code == 409
+    assert interaction_response.json()["detail"] == (
+        "An offer interaction cannot be created for a tracked "
+        f"vacancy with status {terminal_status}."
+    )
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+    interactions_response = client.get(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    assert tracked_response.json()["status"] == terminal_status
+    assert interactions_response.status_code == 200
+    assert interactions_response.json() == []
