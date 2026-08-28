@@ -137,6 +137,16 @@ async def create_interaction(
 
         tracked_vacancy.applied_at = data.occurred_at
 
+    if (
+        tracked_vacancy.status == TrackedVacancyStatus.RESUME_SENT
+        and data.direction == InteractionDirection.INCOMING
+        and data.interaction_type in {
+            InteractionType.MESSAGE,
+            InteractionType.CALL,
+        }
+    ):
+        tracked_vacancy.status = TrackedVacancyStatus.RECRUITER_CONTACT
+
     try:
         await db.commit()
     except Exception:

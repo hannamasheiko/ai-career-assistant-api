@@ -651,3 +651,122 @@ def test_failed_resume_sent_creation_keeps_tracked_vacancy_unchanged(
     assert tracked_response.json()["applied_at"] is None
     assert interactions_response.status_code == 200
     assert interactions_response.json() == []
+
+
+@pytest.mark.parametrize(
+    (
+        "initial_status",
+        "interaction_type",
+        "direction",
+        "expected_status",
+    ),
+    [
+        pytest.param(
+            "resume_sent",
+            "message",
+            "incoming",
+            "recruiter_contact",
+            id="incoming-message-advances-status",
+        ),
+        pytest.param(
+            "resume_sent",
+            "call",
+            "incoming",
+            "recruiter_contact",
+            id="incoming-call-advances-status",
+        ),
+        pytest.param(
+            "resume_sent",
+            "message",
+            "outgoing",
+            "resume_sent",
+            id="outgoing-message-keeps-status",
+        ),
+        pytest.param(
+            "resume_sent",
+            "call",
+            "outgoing",
+            "resume_sent",
+            id="outgoing-call-keeps-status",
+        ),
+        pytest.param(
+            "screening",
+            "message",
+            "incoming",
+            "screening",
+            id="incoming-message-does-not-roll-back-screening",
+        ),
+        pytest.param(
+            "interview",
+            "call",
+            "incoming",
+            "interview",
+            id="incoming-call-does-not-roll-back-interview",
+        ),
+    ],
+)
+def test_meaningful_interaction_updates_only_resume_sent_status(
+    client,
+    monkeypatch,
+    initial_status,
+    interaction_type,
+    direction,
+    expected_status,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    unchanged_fields = {
+        "priority": "high",
+        "decision": "consider_later",
+        "applied_at": "2026-08-18T09:00:00+00:00",
+        "closed_at": "2026-08-25T09:00:00+00:00",
+        "next_action_at": "2026-08-30T09:00:00+00:00",
+    }
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={
+            "status": initial_status,
+            **unchanged_fields,
+        },
+    )
+    assert update_response.status_code == 200
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data={
+            "interaction_type": interaction_type,
+            "direction": direction,
+            "message_text": "Meaningful recruiter communication.",
+            "occurred_at": "2026-08-20T10:00:00+00:00",
+        },
+    )
+
+    assert interaction_response.status_code == 201
+    assert interaction_response.json()["interaction_type"] == (
+        interaction_type
+    )
+    assert interaction_response.json()["direction"] == direction
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    tracked_data = tracked_response.json()
+    assert tracked_data["status"] == expected_status
+    assert tracked_data["priority"] == unchanged_fields["priority"]
+    assert tracked_data["decision"] == unchanged_fields["decision"]
+    for field_name in (
+        "applied_at",
+        "closed_at",
+        "next_action_at",
+    ):
+        assert datetime.fromisoformat(tracked_data[field_name]) == (
+            datetime.fromisoformat(unchanged_fields[field_name])
+        )
