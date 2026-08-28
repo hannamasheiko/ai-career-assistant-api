@@ -180,6 +180,34 @@ async def create_interaction(
     ):
         tracked_vacancy.status = TrackedVacancyStatus.RECRUITER_CONTACT
 
+    if (
+        tracked_vacancy.status
+        in {
+            TrackedVacancyStatus.RESUME_SENT,
+            TrackedVacancyStatus.RECRUITER_CONTACT,
+        }
+        and data.interaction_type == InteractionType.SCREENING_QUESTIONS
+        and data.direction == InteractionDirection.INCOMING
+    ):
+        tracked_vacancy.status = TrackedVacancyStatus.SCREENING
+
+    if (
+        tracked_vacancy.status
+        in {
+            TrackedVacancyStatus.RESUME_SENT,
+            TrackedVacancyStatus.RECRUITER_CONTACT,
+            TrackedVacancyStatus.SCREENING,
+            TrackedVacancyStatus.TEST_TASK,
+        }
+        and data.interaction_type
+        in {
+            InteractionType.HR_INTERVIEW,
+            InteractionType.TECHNICAL_INTERVIEW,
+            InteractionType.FINAL_INTERVIEW,
+        }
+    ):
+        tracked_vacancy.status = TrackedVacancyStatus.INTERVIEW
+
     if data.interaction_type == InteractionType.REJECTION:
         tracked_vacancy.status = TrackedVacancyStatus.REJECTED
         tracked_vacancy.priority = TrackedVacancyPriority.LOW
