@@ -8,6 +8,7 @@ from app.models.resume import ResumeDocument
 from app.models.tracked_vacancy import TrackedVacancy
 from app.models.vacancy import Vacancy, VacancyAnalysis
 from app.schemas.ai_outputs import ParsedMatchAnalysis
+from app.schemas.tracked_vacancy_enums import TrackedVacancyStatus
 from app.core.config import settings
 from app.ai.prompts.match_analysis import MATCH_ANALYSIS_PROMPT_VERSION
 from app.core.exceptions import AIPrerequisiteError
@@ -196,6 +197,9 @@ async def create_or_update_match_analysis(
         )
         match_analysis.ai_model = settings.openai_model
         match_analysis.prompt_version = MATCH_ANALYSIS_PROMPT_VERSION
+
+    if tracked_vacancy.status == TrackedVacancyStatus.SAVED:
+        tracked_vacancy.status = TrackedVacancyStatus.ANALYZED
 
     await db.commit()
     await db.refresh(match_analysis)

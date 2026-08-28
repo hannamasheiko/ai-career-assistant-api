@@ -1,7 +1,9 @@
 import uuid
+from datetime import datetime
 from unittest.mock import AsyncMock
 
 from app.ai.prompts.match_analysis import MATCH_ANALYSIS_PROMPT_VERSION
+from app.core.exceptions import AIServiceError
 from app.schemas.ai_outputs import (
     ParsedMatchAnalysis,
     ParsedResume,
@@ -355,6 +357,14 @@ def test_create_match_analysis(client, monkeypatch):
     assert response_data["ai_model"] is not None
     assert response_data["prompt_version"] == MATCH_ANALYSIS_PROMPT_VERSION
 
+    tracked_response = client.get(
+        f"/tracked-vacancies/{test_data['tracked_vacancy']['id']}",
+        headers=test_data["auth_headers"],
+    )
+
+    assert tracked_response.status_code == 200
+    assert tracked_response.json()["status"] == "analyzed"
+
 
 def test_get_match_analysis(client, monkeypatch):
     test_data = prepare_match_analysis_data(client, monkeypatch)
@@ -504,12 +514,18 @@ def test_regenerate_match_analysis_updates_existing_record(
         match_analysis_path,
         headers=test_data["auth_headers"],
     )
+    tracked_after_first_analysis = client.get(
+        f"/tracked-vacancies/{test_data['tracked_vacancy']['id']}",
+        headers=test_data["auth_headers"],
+    )
     second_response = client.post(
         match_analysis_path,
         headers=test_data["auth_headers"],
     )
 
     assert first_response.status_code == 201
+    assert tracked_after_first_analysis.status_code == 200
+    assert tracked_after_first_analysis.json()["status"] == "analyzed"
     assert second_response.status_code == 201
 
     first_data = first_response.json()
@@ -531,3 +547,95 @@ def test_regenerate_match_analysis_updates_existing_record(
     assert get_response.json()["id"] == first_data["id"]
     assert get_response.json()["match_score"] == 85
     assert get_response.json()["recommendation"] == "strong_match"
+
+    tracked_response = client.get(
+        f"/tracked-vacancies/{test_data['tracked_vacancy']['id']}",
+        headers=test_data["auth_headers"],
+    )
+
+    assert tracked_response.status_code == 200
+    assert tracked_response.json()["status"] == "analyzed"
+
+
+def test_match_analysis_does_not_change_later_tracked_vacancy_status(
+    client,
+    monkeypatch,
+):
+    test_data = prepare_match_analysis_data(client, monkeypatch)
+    tracked_vacancy_path = (
+        f"/tracked-vacancies/{test_data['tracked_vacancy']['id']}"
+    )
+    tracked_update = {
+        "status": "screening",
+        "priority": "high",
+        "decision": "consider_later",
+        "applied_at": "2026-08-20T09:00:00+00:00",
+        "closed_at": "2026-08-25T09:00:00+00:00",
+        "next_action_at": "2026-08-30T09:00:00+00:00",
+    }
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=test_data["auth_headers"],
+        json=tracked_update,
+    )
+    assert update_response.status_code == 200
+
+    monkeypatch.setattr(
+        "app.services.match_analysis_service.parse_match_analysis_chain",
+        AsyncMock(return_value=build_match_analysis_result()),
+    )
+
+    response = client.post(
+        f"{tracked_vacancy_path}/match-analysis",
+        headers=test_data["auth_headers"],
+    )
+
+    assert response.status_code == 201
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=test_data["auth_headers"],
+    )
+
+    assert tracked_response.status_code == 200
+    tracked_data = tracked_response.json()
+    assert tracked_data["status"] == "screening"
+    assert tracked_data["priority"] == "high"
+    assert tracked_data["decision"] == "consider_later"
+    for field_name in ("applied_at", "closed_at", "next_action_at"):
+        assert datetime.fromisoformat(tracked_data[field_name]) == (
+            datetime.fromisoformat(tracked_update[field_name])
+        )
+
+
+def test_failed_match_analysis_keeps_saved_status(client, monkeypatch):
+    test_data = prepare_match_analysis_data(client, monkeypatch)
+
+    monkeypatch.setattr(
+        "app.services.match_analysis_service.parse_match_analysis_chain",
+        AsyncMock(side_effect=AIServiceError("AI service failed")),
+    )
+
+    response = client.post(
+        "/tracked-vacancies/"
+        f"{test_data['tracked_vacancy']['id']}/match-analysis",
+        headers=test_data["auth_headers"],
+    )
+
+    assert response.status_code == 503
+
+    tracked_response = client.get(
+        f"/tracked-vacancies/{test_data['tracked_vacancy']['id']}",
+        headers=test_data["auth_headers"],
+    )
+
+    assert tracked_response.status_code == 200
+    assert tracked_response.json()["status"] == "saved"
+
+    match_analysis_response = client.get(
+        "/tracked-vacancies/"
+        f"{test_data['tracked_vacancy']['id']}/match-analysis",
+        headers=test_data["auth_headers"],
+    )
+
+    assert match_analysis_response.status_code == 404
