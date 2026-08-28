@@ -6,6 +6,19 @@ from app.models.interaction import Interaction
 from app.models.resume import ResumeDocument
 from app.models.tracked_vacancy import TrackedVacancy
 from app.schemas.interaction import InteractionCreate, InteractionUpdate
+from app.schemas.interaction_enums import (
+    InteractionDirection,
+    InteractionType,
+)
+from app.schemas.tracked_vacancy_enums import TrackedVacancyStatus
+
+
+class InvalidInteractionError(ValueError):
+    """Interaction data violates a domain rule."""
+
+
+class DuplicateResumeSentInteractionError(ValueError):
+    """A resume-sent lifecycle event already exists."""
 
 
 async def get_tracked_vacancy_for_interaction(
@@ -82,6 +95,28 @@ async def create_interaction(
 ) -> Interaction:
     """Create interaction for tracked vacancy."""
 
+    if (
+        data.interaction_type == InteractionType.RESUME_SENT
+        and data.direction != InteractionDirection.OUTGOING
+    ):
+        raise InvalidInteractionError(
+            "A resume_sent interaction must have outgoing direction."
+        )
+
+    if data.interaction_type == InteractionType.RESUME_SENT:
+        existing_result = await db.execute(
+            select(Interaction.id).where(
+                Interaction.tracked_vacancy_id == tracked_vacancy.id,
+                Interaction.interaction_type == InteractionType.RESUME_SENT,
+            )
+        )
+
+        if existing_result.scalar_one_or_none() is not None:
+            raise DuplicateResumeSentInteractionError(
+                "A resume_sent interaction already exists for this "
+                "tracked vacancy."
+            )
+
     interaction = Interaction(
         tracked_vacancy_id=tracked_vacancy.id,
         interaction_type=data.interaction_type,
@@ -93,7 +128,21 @@ async def create_interaction(
 
     db.add(interaction)
 
-    await db.commit()
+    if data.interaction_type == InteractionType.RESUME_SENT:
+        if tracked_vacancy.status in {
+            TrackedVacancyStatus.SAVED,
+            TrackedVacancyStatus.ANALYZED,
+        }:
+            tracked_vacancy.status = TrackedVacancyStatus.RESUME_SENT
+
+        tracked_vacancy.applied_at = data.occurred_at
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
     await db.refresh(interaction)
 
     return interaction

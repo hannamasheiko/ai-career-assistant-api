@@ -1,5 +1,9 @@
 import uuid
 from datetime import datetime
+from unittest.mock import AsyncMock
+
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.ai_outputs import (
     ParsedResume,
@@ -191,6 +195,28 @@ def create_test_interaction(
     assert response.status_code == 201
 
     return response.json()
+
+
+def create_resume_sent_interaction(
+    client,
+    auth_headers: dict[str, str],
+    tracked_vacancy_id: int,
+    *,
+    direction: str = "outgoing",
+    occurred_at: str = "2026-08-18T09:30:00+00:00",
+):
+    """Create a resume-sent interaction response."""
+
+    return client.post(
+        f"/tracked-vacancies/{tracked_vacancy_id}/interactions",
+        headers=auth_headers,
+        data={
+            "interaction_type": "resume_sent",
+            "direction": direction,
+            "message_text": "Please find my CV attached.",
+            "occurred_at": occurred_at,
+        },
+    )
 
 
 def test_create_interaction(client, monkeypatch):
@@ -386,3 +412,242 @@ def test_other_user_cannot_access_interactions(client, monkeypatch):
     assert get_response.json()["detail"] == "Interaction not found."
     assert update_response.status_code == 404
     assert update_response.json()["detail"] == "Interaction not found."
+
+
+def test_resume_sent_updates_saved_tracked_vacancy(client, monkeypatch):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    unrelated_fields = {
+        "priority": "high",
+        "decision": "consider_later",
+        "closed_at": "2026-08-25T09:00:00+00:00",
+        "next_action_at": "2026-08-30T09:00:00+00:00",
+    }
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json=unrelated_fields,
+    )
+    assert update_response.status_code == 200
+    occurred_at = "2026-08-18T09:30:00+00:00"
+
+    response = create_resume_sent_interaction(
+        client,
+        auth_headers,
+        tracked_vacancy["id"],
+        occurred_at=occurred_at,
+    )
+
+    assert response.status_code == 201
+    assert response.json()["interaction_type"] == "resume_sent"
+    assert response.json()["direction"] == "outgoing"
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    tracked_data = tracked_response.json()
+    assert tracked_data["status"] == "resume_sent"
+    assert datetime.fromisoformat(tracked_data["applied_at"]) == (
+        datetime.fromisoformat(occurred_at)
+    )
+    assert tracked_data["priority"] == unrelated_fields["priority"]
+    assert tracked_data["decision"] == unrelated_fields["decision"]
+    for field_name in ("closed_at", "next_action_at"):
+        assert datetime.fromisoformat(tracked_data[field_name]) == (
+            datetime.fromisoformat(unrelated_fields[field_name])
+        )
+
+
+def test_resume_sent_updates_analyzed_tracked_vacancy(client, monkeypatch):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={"status": "analyzed"},
+    )
+    assert update_response.status_code == 200
+    occurred_at = "2026-08-18T10:30:00+00:00"
+
+    response = create_resume_sent_interaction(
+        client,
+        auth_headers,
+        tracked_vacancy["id"],
+        occurred_at=occurred_at,
+    )
+
+    assert response.status_code == 201
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    assert tracked_response.json()["status"] == "resume_sent"
+    assert datetime.fromisoformat(
+        tracked_response.json()["applied_at"]
+    ) == datetime.fromisoformat(occurred_at)
+
+
+def test_resume_sent_does_not_roll_back_later_status(client, monkeypatch):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={"status": "screening"},
+    )
+    assert update_response.status_code == 200
+    occurred_at = "2026-08-18T10:30:00+00:00"
+
+    response = create_resume_sent_interaction(
+        client,
+        auth_headers,
+        tracked_vacancy["id"],
+        occurred_at=occurred_at,
+    )
+
+    assert response.status_code == 201
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    assert tracked_response.json()["status"] == "screening"
+    assert datetime.fromisoformat(
+        tracked_response.json()["applied_at"]
+    ) == datetime.fromisoformat(occurred_at)
+
+
+def test_resume_sent_rejects_incoming_direction(client, monkeypatch):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+
+    response = create_resume_sent_interaction(
+        client,
+        auth_headers,
+        tracked_vacancy["id"],
+        direction="incoming",
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "A resume_sent interaction must have outgoing direction."
+    )
+
+    tracked_response = client.get(
+        f"/tracked-vacancies/{tracked_vacancy['id']}",
+        headers=auth_headers,
+    )
+    interactions_response = client.get(
+        f"/tracked-vacancies/{tracked_vacancy['id']}/interactions",
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    assert tracked_response.json()["status"] == "saved"
+    assert tracked_response.json()["applied_at"] is None
+    assert interactions_response.status_code == 200
+    assert interactions_response.json() == []
+
+
+def test_cannot_create_duplicate_resume_sent_interaction(
+    client,
+    monkeypatch,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    first_occurred_at = "2026-08-18T09:30:00+00:00"
+    first_response = create_resume_sent_interaction(
+        client,
+        auth_headers,
+        tracked_vacancy["id"],
+        occurred_at=first_occurred_at,
+    )
+
+    second_response = create_resume_sent_interaction(
+        client,
+        auth_headers,
+        tracked_vacancy["id"],
+        occurred_at="2026-08-19T09:30:00+00:00",
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 409
+    assert second_response.json()["detail"] == (
+        "A resume_sent interaction already exists for this tracked vacancy."
+    )
+
+    interactions_response = client.get(
+        f"/tracked-vacancies/{tracked_vacancy['id']}/interactions",
+        headers=auth_headers,
+    )
+    tracked_response = client.get(
+        f"/tracked-vacancies/{tracked_vacancy['id']}",
+        headers=auth_headers,
+    )
+
+    assert interactions_response.status_code == 200
+    assert len(interactions_response.json()) == 1
+    assert tracked_response.status_code == 200
+    assert datetime.fromisoformat(
+        tracked_response.json()["applied_at"]
+    ) == datetime.fromisoformat(first_occurred_at)
+
+
+def test_failed_resume_sent_creation_keeps_tracked_vacancy_unchanged(
+    client,
+    monkeypatch,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+
+    with monkeypatch.context() as commit_patch:
+        commit_patch.setattr(
+            AsyncSession,
+            "commit",
+            AsyncMock(side_effect=RuntimeError("Database commit failed")),
+        )
+
+        with pytest.raises(RuntimeError, match="Database commit failed"):
+            create_resume_sent_interaction(
+                client,
+                auth_headers,
+                tracked_vacancy["id"],
+            )
+
+    tracked_response = client.get(
+        f"/tracked-vacancies/{tracked_vacancy['id']}",
+        headers=auth_headers,
+    )
+    interactions_response = client.get(
+        f"/tracked-vacancies/{tracked_vacancy['id']}/interactions",
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    assert tracked_response.json()["status"] == "saved"
+    assert tracked_response.json()["applied_at"] is None
+    assert interactions_response.status_code == 200
+    assert interactions_response.json() == []

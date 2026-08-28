@@ -10,6 +10,8 @@ from app.schemas.interaction import (
     InteractionUpdate,
 )
 from app.services.interaction_service import (
+    DuplicateResumeSentInteractionError,
+    InvalidInteractionError,
     create_interaction,
     get_interaction_for_user,
     get_interactions_for_tracked_vacancy,
@@ -65,11 +67,22 @@ async def create_interaction_endpoint(
             detail="Tracked vacancy not found.",
         )
 
-    interaction = await create_interaction(
-        db=db,
-        tracked_vacancy=tracked_vacancy,
-        data=data,
-    )
+    try:
+        interaction = await create_interaction(
+            db=db,
+            tracked_vacancy=tracked_vacancy,
+            data=data,
+        )
+    except InvalidInteractionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except DuplicateResumeSentInteractionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
 
     return interaction
 
