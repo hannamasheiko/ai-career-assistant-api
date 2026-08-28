@@ -10,7 +10,11 @@ from app.schemas.interaction_enums import (
     InteractionDirection,
     InteractionType,
 )
-from app.schemas.tracked_vacancy_enums import TrackedVacancyStatus
+from app.schemas.tracked_vacancy_enums import (
+    TrackedVacancyDecision,
+    TrackedVacancyPriority,
+    TrackedVacancyStatus,
+)
 
 
 class InvalidInteractionError(ValueError):
@@ -19,6 +23,10 @@ class InvalidInteractionError(ValueError):
 
 class DuplicateResumeSentInteractionError(ValueError):
     """A resume-sent lifecycle event already exists."""
+
+
+class InvalidInteractionTransitionError(ValueError):
+    """Interaction cannot transition the tracked vacancy from its status."""
 
 
 async def get_tracked_vacancy_for_interaction(
@@ -103,6 +111,31 @@ async def create_interaction(
             "A resume_sent interaction must have outgoing direction."
         )
 
+    if (
+        data.interaction_type == InteractionType.REJECTION
+        and data.direction != InteractionDirection.INCOMING
+    ):
+        raise InvalidInteractionError(
+            "A rejection interaction must have incoming direction."
+        )
+
+    if (
+        data.interaction_type == InteractionType.REJECTION
+        and tracked_vacancy.status
+        not in {
+            TrackedVacancyStatus.RESUME_SENT,
+            TrackedVacancyStatus.RECRUITER_CONTACT,
+            TrackedVacancyStatus.SCREENING,
+            TrackedVacancyStatus.INTERVIEW,
+            TrackedVacancyStatus.TEST_TASK,
+            TrackedVacancyStatus.OFFER,
+        }
+    ):
+        raise InvalidInteractionTransitionError(
+            "A rejection interaction cannot be created for a tracked "
+            f"vacancy with status {tracked_vacancy.status}."
+        )
+
     if data.interaction_type == InteractionType.RESUME_SENT:
         existing_result = await db.execute(
             select(Interaction.id).where(
@@ -146,6 +179,12 @@ async def create_interaction(
         }
     ):
         tracked_vacancy.status = TrackedVacancyStatus.RECRUITER_CONTACT
+
+    if data.interaction_type == InteractionType.REJECTION:
+        tracked_vacancy.status = TrackedVacancyStatus.REJECTED
+        tracked_vacancy.priority = TrackedVacancyPriority.LOW
+        tracked_vacancy.decision = TrackedVacancyDecision.NOT_INTERESTED
+        tracked_vacancy.closed_at = data.occurred_at
 
     try:
         await db.commit()

@@ -770,3 +770,256 @@ def test_meaningful_interaction_updates_only_resume_sent_status(
         assert datetime.fromisoformat(tracked_data[field_name]) == (
             datetime.fromisoformat(unchanged_fields[field_name])
         )
+
+
+@pytest.mark.parametrize(
+    "initial_status",
+    [
+        "resume_sent",
+        "recruiter_contact",
+        "screening",
+        "interview",
+        "test_task",
+        "offer",
+    ],
+)
+def test_incoming_rejection_closes_active_tracked_vacancy(
+    client,
+    monkeypatch,
+    initial_status,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    unchanged_fields = {
+        "applied_at": "2026-08-10T09:00:00+00:00",
+        "next_action_at": "2026-08-30T09:00:00+00:00",
+    }
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={
+            "status": initial_status,
+            "priority": "high",
+            "decision": "interested",
+            **unchanged_fields,
+        },
+    )
+    assert update_response.status_code == 200
+    occurred_at = "2026-08-20T10:00:00+00:00"
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data={
+            "interaction_type": "rejection",
+            "direction": "incoming",
+            "summary": "Employer rejected the application.",
+            "occurred_at": occurred_at,
+        },
+    )
+
+    assert interaction_response.status_code == 201
+    interaction_data = interaction_response.json()
+    assert interaction_data["interaction_type"] == "rejection"
+    assert interaction_data["direction"] == "incoming"
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    tracked_data = tracked_response.json()
+    assert tracked_data["status"] == "rejected"
+    assert tracked_data["priority"] == "low"
+    assert tracked_data["decision"] == "not_interested"
+    assert datetime.fromisoformat(tracked_data["closed_at"]) == (
+        datetime.fromisoformat(occurred_at)
+    )
+    assert datetime.fromisoformat(tracked_data["closed_at"]) != (
+        datetime.fromisoformat(interaction_data["created_at"])
+    )
+    for field_name in ("applied_at", "next_action_at"):
+        assert datetime.fromisoformat(tracked_data[field_name]) == (
+            datetime.fromisoformat(unchanged_fields[field_name])
+        )
+
+
+def test_rejection_rejects_outgoing_direction(client, monkeypatch):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={"status": "resume_sent"},
+    )
+    assert update_response.status_code == 200
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data={
+            "interaction_type": "rejection",
+            "direction": "outgoing",
+            "occurred_at": "2026-08-20T10:00:00+00:00",
+        },
+    )
+
+    assert interaction_response.status_code == 400
+    assert interaction_response.json()["detail"] == (
+        "A rejection interaction must have incoming direction."
+    )
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+    interactions_response = client.get(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    assert tracked_response.json()["status"] == "resume_sent"
+    assert tracked_response.json()["closed_at"] is None
+    assert interactions_response.status_code == 200
+    assert interactions_response.json() == []
+
+
+@pytest.mark.parametrize(
+    "terminal_status",
+    ["rejected", "discarded", "closed"],
+)
+def test_rejection_does_not_overwrite_terminal_tracked_vacancy(
+    client,
+    monkeypatch,
+    terminal_status,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    terminal_fields = {
+        "priority": "high",
+        "decision": "consider_later",
+        "applied_at": "2026-08-10T09:00:00+00:00",
+        "closed_at": "2026-08-15T09:00:00+00:00",
+        "next_action_at": "2026-08-30T09:00:00+00:00",
+    }
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={
+            "status": terminal_status,
+            **terminal_fields,
+        },
+    )
+    assert update_response.status_code == 200
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data={
+            "interaction_type": "rejection",
+            "direction": "incoming",
+            "occurred_at": "2026-08-20T10:00:00+00:00",
+        },
+    )
+
+    assert interaction_response.status_code == 409
+    assert interaction_response.json()["detail"] == (
+        "A rejection interaction cannot be created for a tracked "
+        f"vacancy with status {terminal_status}."
+    )
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+    interactions_response = client.get(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    tracked_data = tracked_response.json()
+    assert tracked_data["status"] == terminal_status
+    assert tracked_data["priority"] == terminal_fields["priority"]
+    assert tracked_data["decision"] == terminal_fields["decision"]
+    for field_name in ("applied_at", "closed_at", "next_action_at"):
+        assert datetime.fromisoformat(tracked_data[field_name]) == (
+            datetime.fromisoformat(terminal_fields[field_name])
+        )
+    assert interactions_response.status_code == 200
+    assert interactions_response.json() == []
+
+
+def test_failed_rejection_keeps_tracked_vacancy_unchanged(
+    client,
+    monkeypatch,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    original_fields = {
+        "status": "resume_sent",
+        "priority": "high",
+        "decision": "interested",
+        "applied_at": "2026-08-10T09:00:00+00:00",
+        "next_action_at": "2026-08-30T09:00:00+00:00",
+    }
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json=original_fields,
+    )
+    assert update_response.status_code == 200
+
+    with monkeypatch.context() as commit_patch:
+        commit_patch.setattr(
+            AsyncSession,
+            "commit",
+            AsyncMock(side_effect=RuntimeError("Database commit failed")),
+        )
+
+        with pytest.raises(RuntimeError, match="Database commit failed"):
+            client.post(
+                f"{tracked_vacancy_path}/interactions",
+                headers=auth_headers,
+                data={
+                    "interaction_type": "rejection",
+                    "direction": "incoming",
+                    "occurred_at": "2026-08-20T10:00:00+00:00",
+                },
+            )
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+    interactions_response = client.get(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    tracked_data = tracked_response.json()
+    assert tracked_data["status"] == original_fields["status"]
+    assert tracked_data["priority"] == original_fields["priority"]
+    assert tracked_data["decision"] == original_fields["decision"]
+    assert tracked_data["closed_at"] is None
+    for field_name in ("applied_at", "next_action_at"):
+        assert datetime.fromisoformat(tracked_data[field_name]) == (
+            datetime.fromisoformat(original_fields[field_name])
+        )
+    assert interactions_response.status_code == 200
+    assert interactions_response.json() == []
