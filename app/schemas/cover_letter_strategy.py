@@ -35,3 +35,14 @@ class CoverLetterStrategy(BaseModel):
             "but must not be a ready-made cover letter paragraph."
         )
     )
+    supporting_evidence: list[str] = Field(
+        description=(
+            "Additional vacancy-specific factual evidence from the candidate's "
+            "resume that materially strengthens the primary evidence or "
+            "supports other important key hiring criteria. Each item must add "
+            "a distinct, meaningful argument for the hiring decision rather "
+            "than duplicate the primary evidence. Include only evidence with "
+            "real hiring value, not every relevant experience; an empty list "
+            "is valid when no additional evidence adds substantial value."
+        )
+    )

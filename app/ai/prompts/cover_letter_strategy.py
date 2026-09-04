@@ -57,8 +57,8 @@ primary_hiring_focus — це одна головна річ, яку робот�
 - Якщо кілька критеріїв виглядають важливими, обери той, без підтвердження якого
   кандидат найімовірніше не пройде первинний відбір, або той, на якому вакансія
   робить найбільший акцент.
-- Сформулюй його стисло, але достатньо конкретно, щоб на наступному кроці за
-  ним можна було вибрати найкращий evidence кандидата.
+- Сформулюй його стисло, але достатньо конкретно, щоб за ним можна було оцінити
+  та вибрати найкращий evidence кандидата.
 
 Залежно від вакансії головним hiring criterion може бути:
 
@@ -99,7 +99,8 @@ key_hiring_criteria — це 2–4 найважливіші критерії, я
 - Не створюй checklist усіх technologies або skills.
 - Об'єднуй пов'язані requirements у hiring-level criterion, якщо вони разом
   доводять одну професійну здатність.
-- Кожен criterion повинен описувати окрему важливу професійну здатність, тип досвіду або рівень відповідальності, який має значення для hiring decision
+- Кожен criterion повинен описувати окрему важливу професійну здатність, тип
+  досвіду або рівень відповідальності, який має значення для hiring decision.
 - Criteria повинні бути достатньо конкретними, щоб за ними можна було оцінювати
   та вибирати evidence у досвіді кандидата.
 - Не дублюй один criterion різними формулюваннями.
@@ -109,7 +110,8 @@ key_hiring_criteria — це 2–4 найважливіші критерії, я
   критерію.
 - Не перетворюй partial або optional requirement на ключовий criterion без
   достатнього акценту у вакансії.
-- Не формулюй criterion настільки широко, щоб він охоплював майже всю роль цілком
+- Не формулюй criterion настільки широко, щоб він охоплював майже всю роль
+  цілком.
 
 Зв'язок із primary_hiring_focus:
 
@@ -199,6 +201,106 @@ primary_evidence повинно містити:
 - твердження про досвід, яких немає в resume.
 
 Writer пізніше сам перетворить цей structured evidence на природний текст листа.
+
+SUPPORTING_EVIDENCE
+
+supporting_evidence — це мінімальний набір додаткових сильних factual evidence,
+які суттєво підсилюють primary_evidence або підтверджують інші важливі
+key_hiring_criteria.
+
+Supporting evidence потрібні не для повнішого переказу resume, а лише тоді,
+коли вони додають окрему hiring value.
+
+Правила вибору:
+
+- Спочатку враховуй уже вибраний primary_evidence.
+- Потім перевір key_hiring_criteria і визнач, чи залишилися важливі criteria або
+  professional dimensions, для яких інший evidence може додати окремий суттєвий
+  аргумент для hiring decision.
+- Використовуй факти з resume.
+- Match analysis використовуй лише як допоміжний сигнал; факт із match analysis
+  не можна використовувати, якщо він не підтверджується resume.
+- Не додавай evidence лише тому, що він існує в resume або загалом виглядає
+  сильним.
+- Не додавай evidence лише для того, щоб список був непорожнім.
+- supporting_evidence може бути [].
+- Не встановлюй фіксовану кількість supporting evidence.
+- Віддавай перевагу мінімальному набору evidence, достатньому для сильного
+  vacancy-specific positioning.
+- Кожен supporting evidence повинен додавати окремий суттєвий proof dimension
+  або hiring argument.
+- Не дублюй primary_evidence іншими словами.
+- Не додавай кілька evidence, які фактично доводять одну й ту саму річ, якщо це
+  не дає суттєвої додаткової hiring value.
+- Не намагайся покрити всі key_hiring_criteria механічно.
+- Наявність key_hiring_criterion сама по собі не означає, що для нього
+  обов'язково потрібен окремий supporting evidence.
+- Не перетворюй список на CV dump.
+- Commercial experience не має автоматичного пріоритету.
+- Pet/project experience не має автоматичного пріоритету.
+- Новіший experience не має автоматичного пріоритету.
+- Exact stack match не має автоматичного пріоритету.
+- Supporting evidence може походити з іншого типу досвіду, ніж primary evidence,
+  якщо це додає важливий complementary proof.
+- Якщо primary evidence вже достатньо для сильного vacancy-specific positioning
+  і додатковий evidence не додає окремої суттєвої hiring value, поверни порожній
+  список.
+
+Кожен елемент supporting_evidence повинен містити достатньо інформації, щоб
+writer зрозумів:
+
+- джерело або професійний контекст evidence;
+- конкретний релевантний зміст;
+- яку окрему professional capability, experience dimension або hiring criterion
+  він підтверджує.
+
+Не генеруй готові cover-letter sentences або paragraphs.
+
+Наведені приклади демонструють принцип вибору evidence, а не фіксований
+пріоритет типів досвіду. Не копіюй їх механічно та не припускай наявність
+аналогічного досвіду у кандидата.
+
+Example 1 — commercial/production-heavy vacancy
+
+Вакансія сильно акцентує required commercial або production experience.
+
+- primary_evidence — релевантний commercial development experience, який
+  доводить production maturity або professional experience;
+- supporting_evidence може включати інший experience або project, якщо він
+  додає окремий важливий proof, наприклад актуальний stack, specialization,
+  integrations, ownership або практичну здатність виконувати центральні tasks
+  ролі;
+- інший specialized project додається лише тоді, коли він підтверджує ще один
+  важливий criterion вакансії.
+
+Example 2 — specialization / AI / hands-on-heavy vacancy
+
+Вакансія насамперед оцінює практичну спеціалізацію, наприклад hands-on AI/LLM
+integrations, а значний commercial experience у цій спеціалізації не є
+головною вимогою.
+
+- primary_evidence — найбільш прямий hands-on project або experience у
+  потрібній спеціалізації;
+- supporting_evidence може включати commercial software development experience
+  як доказ professional foundation, production context або роботи з real
+  business logic;
+- інший project додається лише тоді, коли він дає окремий важливий proof.
+
+Example 3 — regular backend vacancy without meaningful AI focus
+
+Вакансія сфокусована на Python/backend development і не має суттєвого
+AI-компонента.
+
+- primary_evidence — experience або project, який найбільш прямо доводить
+  здатність виконувати центральні backend tasks;
+- supporting_evidence може включати commercial development experience, якщо
+  воно додає production або professional proof;
+- не додавай AI-specific project лише тому, що він сильний, складний або новий,
+  якщо його AI-specific складова не додає окремої hiring value для цієї
+  вакансії.
+
+Залежно від вакансії той самий тип experience може бути primary evidence,
+supporting evidence або взагалі не використовуватися.
 """
 
 
