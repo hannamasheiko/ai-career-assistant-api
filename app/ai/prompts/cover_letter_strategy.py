@@ -301,6 +301,112 @@ AI-компонента.
 
 Залежно від вакансії той самий тип experience може бути primary evidence,
 supporting evidence або взагалі не використовуватися.
+
+POSITIONING_STRATEGY
+
+positioning_strategy — це коротка стратегічна інструкція для writer-а про те,
+як подати вже відібрані primary_evidence і supporting_evidence як одну
+професійно цілісну vacancy-specific історію.
+
+Evidence відповідає на питання:
+
+- що саме кандидат може фактично довести.
+
+Positioning strategy відповідає на питання:
+
+- як ці докази повинні бути інтерпретовані та поєднані в cover letter.
+
+Джерела:
+
+1. Використовуй primary_hiring_focus.
+2. Використовуй key_hiring_criteria.
+3. Використовуй уже вибраний primary_evidence.
+4. Використовуй уже вибраний supporting_evidence.
+5. Фактичний resume використовуй лише для перевірки коректності positioning.
+6. Match analysis використовуй лише як допоміжний контекст.
+
+Не використовуй positioning step для повторного evidence selection.
+
+Правила:
+
+- Визнач один основний professional angle для cover letter.
+- Побудуй його навколо primary_evidence.
+- supporting_evidence використовуй лише як complementary proof.
+- Не перетворюй усі evidence на рівнозначний список.
+- Не намагайся одночасно представити кандидата через усі його професійні
+  напрями, спеціалізації або типи досвіду, якщо вакансія не потребує такого
+  широкого positioning.
+- Основне професійне позиціонування повинно відповідати вакансії, а не повному
+  спектру досвіду кандидата.
+- Не змінюй фактичну природу evidence заради сильнішого positioning.
+- Project experience не можна подавати як commercial experience.
+- Не підвищуй фактичний статус, масштаб, рівень відповідальності або тип досвіду
+  заради сильнішого positioning.
+- Досвід у суміжній технології, домені, типі задач або професійному напрямі не
+  можна подавати як прямий досвід у required area без достатніх фактичних
+  підстав.
+- Поточний або новіший project не повинен автоматично визначати professional
+  identity кандидата.
+- Попередній commercial experience не повинен автоматично визначати professional
+  identity кандидата, якщо інший evidence значно точніше відповідає ролі.
+- Якщо різні evidence виконують різні функції, явно визнач їхню роль у
+  positioning: наприклад, specialization + professional foundation або
+  production maturity + current hands-on stack.
+- Якщо структура досвіду кандидата неочевидна, дай writer-у коротку factual
+  boundary, яка запобігає перебільшенню.
+- Якщо спеціального caveat не потрібно, не вигадуй його.
+- Не роби positioning defensive. Не акцентуй на слабкостях, прогалинах або тому,
+  чого кандидату бракує, якщо це не потрібно для factual accuracy.
+- Не використовуй формулювання на кшталт "despite lacking", "although the
+  candidate does not have", "compensates for lack of".
+- Positioning має показувати логічний професійний зв'язок між релевантними
+  evidence, а не пояснювати або виправдовувати кандидата.
+- Не згадуй evidence, якого немає в primary_evidence або supporting_evidence.
+- Не додавай нові facts із resume самостійно.
+- Не генеруй готові речення cover letter.
+- Формулюй positioning_strategy стисло: достатньо конкретно для writer-а, але
+  без зайвого переказу evidence.
+
+Наведені приклади демонструють принцип positioning, а не готові формулювання
+для cover letter. Не копіюй їх механічно.
+
+Example 1 — direct specialization match
+
+Якщо primary_evidence найбільш прямо підтверджує центральну професійну
+спеціалізацію вакансії, а supporting_evidence додає доказ ширшої професійної
+зрілості:
+
+Positioning logic:
+
+- потрібна спеціалізація задає основний professional angle;
+- supporting evidence використовується як додатковий proof of maturity,
+  responsibility або broader professional experience;
+- supporting evidence не повинно витісняти більш прямий vacancy-specific proof.
+
+Example 2 — professional maturity primary
+
+Якщо primary_evidence найкраще доводить рівень відповідальності,
+production/professional maturity або досвід виконання подібних задач, а
+supporting_evidence підтверджує актуальну практичну здатність:
+
+Positioning logic:
+
+- professional maturity задає основну credibility;
+- supporting evidence показує актуальність практичних навичок;
+- не представляй supporting evidence як сильніший тип досвіду, ніж він є
+  фактично.
+
+Example 3 — mixed professional background
+
+Якщо кандидат має досвід у кількох напрямах, але вакансія потребує лише частини
+з них:
+
+Positioning logic:
+
+- professional identity для cover letter визначай навколо найбільш
+  vacancy-relevant evidence;
+- інші напрями використовуй лише якщо вони додають окремий важливий proof;
+- не намагайся представити весь професійний профіль кандидата в одному листі.
 """
 
 

@@ -46,3 +46,16 @@ class CoverLetterStrategy(BaseModel):
             "is valid when no additional evidence adds substantial value."
         )
     )
+    positioning_strategy: str = Field(
+        description=(
+            "Short internal guidance for the writer on how to interpret and "
+            "combine the selected primary and supporting evidence into a "
+            "coherent, factually accurate, vacancy-specific professional "
+            "positioning. It must define the main professional angle, the "
+            "distinct roles of primary and supporting evidence, and any factual "
+            "boundary needed to avoid overstating the type or level of "
+            "experience. It must not add or reselect evidence, change the "
+            "hiring criteria, invent facts, or provide ready-to-use cover "
+            "letter text or candidate self-marketing."
+        )
+    )
