@@ -6,13 +6,14 @@ from app.ai.prompts.content_generation import (
     GENERATED_CONTENT_USER_PROMPT,
 )
 from app.schemas.ai_outputs import ParsedGeneratedContent
+from app.schemas.cover_letter_strategy import CoverLetterStrategy
 
 
 async def generate_content_chain(
     content_type: str,
     resume_text: str,
     vacancy_text: str,
-    match_analysis_text: str | None,
+    strategy: CoverLetterStrategy,
     language: str,
     tone: str | None,
     extra_instructions: str | None,
@@ -37,10 +38,11 @@ async def generate_content_chain(
             "content_type": content_type,
             "resume_text": resume_text,
             "vacancy_text": vacancy_text,
-            "match_analysis_text": (
-                match_analysis_text
-                or "Match analysis is not available."
-            ),
+            "primary_hiring_focus": strategy.primary_hiring_focus,
+            "key_hiring_criteria": strategy.key_hiring_criteria,
+            "primary_evidence": strategy.primary_evidence,
+            "supporting_evidence": strategy.supporting_evidence,
+            "positioning_strategy": strategy.positioning_strategy,
             "language": language,
             "tone": tone or "professional",
             "extra_instructions": (

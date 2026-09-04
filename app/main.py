@@ -11,7 +11,10 @@ from app.api.tracked_vacancies import router as tracked_vacancies_router
 from app.api.generated_contents import router as generated_contents_router
 from app.api import interactions
 from app.core.exception_handlers import register_exception_handlers
+from app.core.logging import configure_logging
 
+
+configure_logging()
 
 app = FastAPI(
     title=settings.project_name,
@@ -36,5 +39,4 @@ app.include_router(vacancies_router)
 app.include_router(tracked_vacancies_router)
 app.include_router(interactions.router)
 app.include_router(generated_contents_router)
-
 

@@ -13,6 +13,7 @@ from app.schemas.ai_outputs import (
     ParsedVacancyAnalysis,
     ParsedVacancyDetails,
 )
+from app.schemas.cover_letter_strategy import CoverLetterStrategy
 
 
 VALID_RESUME_TEXT = (
@@ -28,6 +29,22 @@ VALID_VACANCY_TEXT = (
 GENERATED_COVER_LETTER = (
     "Dear Hiring Manager, I am interested in the Python Backend Developer "
     "position at Test Company."
+)
+
+VALID_COVER_LETTER_STRATEGY = CoverLetterStrategy(
+    primary_hiring_focus="Practical backend development ability.",
+    key_hiring_criteria=[
+        "Ability to build reliable backend applications.",
+        "Experience with relational data and API integrations.",
+    ],
+    primary_evidence=(
+        "Resume experience building Python backend applications, "
+        "demonstrating practical backend development ability."
+    ),
+    supporting_evidence=[],
+    positioning_strategy=(
+        "Present the backend experience as the primary professional angle."
+    ),
 )
 
 
@@ -325,14 +342,29 @@ def build_generation_request() -> dict:
     }
 
 
+def mock_cover_letter_strategy(monkeypatch) -> AsyncMock:
+    """Mock cover letter strategy generation with deterministic output."""
+
+    strategy_mock = AsyncMock(
+        return_value=VALID_COVER_LETTER_STRATEGY,
+    )
+    monkeypatch.setattr(
+        "app.services.generated_content_service.generate_cover_letter_strategy",
+        strategy_mock,
+    )
+
+    return strategy_mock
+
+
 def test_generate_cover_letter(client, monkeypatch):
     test_data = prepare_generated_content_data(client, monkeypatch)
+    strategy_mock = mock_cover_letter_strategy(monkeypatch)
 
     async def mock_generate_content_chain(
         content_type,
         resume_text,
         vacancy_text,
-        match_analysis_text,
+        strategy,
         language,
         tone,
         extra_instructions,
@@ -340,7 +372,7 @@ def test_generate_cover_letter(client, monkeypatch):
         assert content_type == "cover_letter"
         assert resume_text == VALID_RESUME_TEXT
         assert vacancy_text == VALID_VACANCY_TEXT
-        assert match_analysis_text is None
+        assert strategy is VALID_COVER_LETTER_STRATEGY
         assert language == "en"
         assert tone == "professional"
         assert extra_instructions == "Keep it concise."
@@ -363,6 +395,12 @@ def test_generate_cover_letter(client, monkeypatch):
     )
 
     assert response.status_code == 201
+
+    strategy_mock.assert_awaited_once_with(
+        resume_text=VALID_RESUME_TEXT,
+        vacancy_text=VALID_VACANCY_TEXT,
+        match_analysis_text="Match analysis is not available.",
+    )
 
     response_data = response.json()
     prompt_context = response_data["prompt_context"]
@@ -394,18 +432,32 @@ def test_generate_cover_letter_uses_match_analysis(
         with_match_analysis=True,
     )
 
-    async def mock_generate_content_chain(**kwargs):
-        match_analysis_text = kwargs["match_analysis_text"]
-
+    async def mock_generate_cover_letter_strategy(
+        resume_text,
+        vacancy_text,
+        match_analysis_text,
+    ):
+        assert resume_text == VALID_RESUME_TEXT
+        assert vacancy_text == VALID_VACANCY_TEXT
         assert "Match score: 82" in match_analysis_text
         assert "Recommendation: good_match" in match_analysis_text
         assert "Strong matches: Python, FastAPI" in match_analysis_text
         assert "Missing skills: Docker" in match_analysis_text
 
+        return VALID_COVER_LETTER_STRATEGY
+
+    async def mock_generate_content_chain(**kwargs):
+        assert kwargs["strategy"] is VALID_COVER_LETTER_STRATEGY
+        assert "match_analysis_text" not in kwargs
+
         return ParsedGeneratedContent(
             generated_text=GENERATED_COVER_LETTER,
         )
 
+    monkeypatch.setattr(
+        "app.services.generated_content_service.generate_cover_letter_strategy",
+        mock_generate_cover_letter_strategy,
+    )
     monkeypatch.setattr(
         "app.services.generated_content_service.generate_content_chain",
         mock_generate_content_chain,
@@ -430,6 +482,7 @@ def test_get_generated_content_history_and_item(
     monkeypatch,
 ):
     test_data = prepare_generated_content_data(client, monkeypatch)
+    mock_cover_letter_strategy(monkeypatch)
     generation_mock = AsyncMock(
         side_effect=[
             ParsedGeneratedContent(generated_text="First cover letter."),
@@ -492,6 +545,7 @@ def test_get_generated_content_history_and_item(
 
 def test_update_generated_content(client, monkeypatch):
     test_data = prepare_generated_content_data(client, monkeypatch)
+    mock_cover_letter_strategy(monkeypatch)
 
     monkeypatch.setattr(
         "app.services.generated_content_service.generate_content_chain",
@@ -551,6 +605,7 @@ def test_other_user_cannot_access_generated_content(
     monkeypatch,
 ):
     test_data = prepare_generated_content_data(client, monkeypatch)
+    strategy_mock = mock_cover_letter_strategy(monkeypatch)
     generation_mock = AsyncMock(
         return_value=ParsedGeneratedContent(
             generated_text=GENERATED_COVER_LETTER,
@@ -613,6 +668,7 @@ def test_other_user_cannot_access_generated_content(
     assert patch_response.status_code == 404
     assert patch_response.json()["detail"] == "Generated content not found."
     assert generation_mock.await_count == 1
+    assert strategy_mock.await_count == 1
 
 
 def test_generate_content_rejects_unsupported_type(
@@ -621,6 +677,7 @@ def test_generate_content_rejects_unsupported_type(
 ):
     test_data = prepare_generated_content_data(client, monkeypatch)
     generation_mock = AsyncMock()
+    strategy_mock = mock_cover_letter_strategy(monkeypatch)
 
     monkeypatch.setattr(
         "app.services.generated_content_service.generate_content_chain",
@@ -643,3 +700,4 @@ def test_generate_content_rejects_unsupported_type(
         "Unsupported generated content type: linkedin_post"
     )
     generation_mock.assert_not_awaited()
+    strategy_mock.assert_not_awaited()

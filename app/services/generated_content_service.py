@@ -1,9 +1,13 @@
+import logging
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.ai.chains.cover_letter_strategy_chain import (
+    generate_cover_letter_strategy,
+)
 from app.ai.chains.generate_content_chain import generate_content_chain
 from app.models.generated_content import GeneratedContent
 from app.models.match_analysis import MatchAnalysis
@@ -15,6 +19,9 @@ from app.ai.prompts.content_generation import (
     GENERATED_CONTENT_PROMPT_VERSION,
 )
 from app.core.config import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 async def get_tracked_vacancy_for_generated_content(
@@ -191,15 +198,34 @@ async def generate_and_save_content(
         tracked_vacancy=tracked_vacancy,
     )
 
-    match_analysis_text = build_match_analysis_text_for_generated_content(
-        match_analysis=match_analysis,
+    match_analysis_text = (
+        build_match_analysis_text_for_generated_content(
+            match_analysis=match_analysis,
+        )
+        or "Match analysis is not available."
+    )
+
+    strategy = await generate_cover_letter_strategy(
+        resume_text=resume_text,
+        vacancy_text=vacancy_text,
+        match_analysis_text=match_analysis_text,
+    )
+
+    logger.info(
+        "Cover letter strategy generated: %s",
+        strategy.model_dump(),
+        extra={
+            "event": "cover_letter_strategy_generated",
+            "tracked_vacancy_id": tracked_vacancy.id,
+            "cover_letter_strategy": strategy.model_dump(),
+        },
     )
 
     parsed_generated_content: ParsedGeneratedContent = await generate_content_chain(
         content_type=data.content_type,
         resume_text=resume_text,
         vacancy_text=vacancy_text,
-        match_analysis_text=match_analysis_text,
+        strategy=strategy,
         language=data.language,
         tone=data.tone,
         extra_instructions=data.extra_instructions,
