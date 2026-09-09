@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     openai_timeout: float = 90.0
     openai_max_retries: int = 2
 
+    openai_embedding_model: str = "text-embedding-3-small"
+    openai_embedding_dimensions: int = 1536
+
     secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
