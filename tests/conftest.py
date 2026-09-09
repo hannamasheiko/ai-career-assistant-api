@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -46,6 +47,9 @@ TestingSessionLocal = async_sessionmaker(
 
 async def recreate_test_database() -> None:
     async with test_engine.begin() as connection:
+        await connection.execute(
+            text("CREATE EXTENSION IF NOT EXISTS vector")
+        )
         await connection.run_sync(Base.metadata.drop_all)
         await connection.run_sync(Base.metadata.create_all)
 

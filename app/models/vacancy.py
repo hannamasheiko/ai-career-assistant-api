@@ -9,6 +9,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.tracked_vacancy import TrackedVacancy
+    from app.models.vacancy_embedding import VacancyEmbedding
 
 
 class Vacancy(Base):
@@ -62,6 +63,12 @@ class Vacancy(Base):
         cascade="all, delete-orphan",
     )
 
+    embedding: Mapped["VacancyEmbedding | None"] = relationship(
+        back_populates="vacancy",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
 
 class VacancyAnalysis(Base):
     """AI-generated structured analysis of a vacancy."""
@@ -104,4 +111,9 @@ class VacancyAnalysis(Base):
 
     vacancy: Mapped["Vacancy"] = relationship(
         back_populates="analyses",
+    )
+
+    embedding: Mapped["VacancyEmbedding | None"] = relationship(
+        back_populates="vacancy_analysis",
+        uselist=False,
     )
