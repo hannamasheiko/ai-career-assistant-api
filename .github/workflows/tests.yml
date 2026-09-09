@@ -10,7 +10,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:0.8.6-pg16-trixie
         env:
           POSTGRES_USER: ai_career_user
           POSTGRES_PASSWORD: ai_career_password
