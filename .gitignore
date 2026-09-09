@@ -30,3 +30,6 @@ htmlcov/
 # Local database files
 *.sqlite3
 *.db
+
+# Local backups
+backups/
