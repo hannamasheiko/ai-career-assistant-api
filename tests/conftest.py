@@ -65,6 +65,12 @@ async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest.fixture()
+def testing_session_factory():
+    """Provide the async test session factory."""
+
+    return TestingSessionLocal
+
+@pytest.fixture()
 def client():
     """Provide an isolated API client with a clean test database."""
 
