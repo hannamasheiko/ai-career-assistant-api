@@ -5,6 +5,8 @@ from decimal import Decimal
 logger = logging.getLogger(__name__)
 
 
+MODEL_PRICING_UPDATED_AT = "2026-09-10"
+
 MODEL_PRICING_USD_PER_1M_TOKENS = {
     "gpt-4o-mini": {
         "input": Decimal("0.15"),
@@ -26,6 +28,10 @@ MODEL_PRICING_USD_PER_1M_TOKENS = {
         "input": Decimal("0.20"),
         "output": Decimal("1.20"),
     },
+    "text-embedding-3-small": {
+        "input": Decimal("0.02"),
+        "output": Decimal("0"),
+    },
 }
 
 
@@ -45,8 +51,16 @@ def calculate_openai_cost(
             "total_cost": None,
         }
 
-    input_cost = (Decimal(input_tokens) / Decimal(1_000_000)) * pricing["input"]
-    output_cost = (Decimal(output_tokens) / Decimal(1_000_000)) * pricing["output"]
+    input_cost = (
+        Decimal(input_tokens)
+        / Decimal(1_000_000)
+        * pricing["input"]
+    )
+    output_cost = (
+        Decimal(output_tokens)
+        / Decimal(1_000_000)
+        * pricing["output"]
+    )
     total_cost = input_cost + output_cost
 
     return {
@@ -70,29 +84,45 @@ def log_openai_usage(
         output_tokens=output_tokens,
     )
 
+    input_cost_usd = (
+        str(cost["input_cost"])
+        if cost["input_cost"] is not None
+        else None
+    )
+    output_cost_usd = (
+        str(cost["output_cost"])
+        if cost["output_cost"] is not None
+        else None
+    )
+    total_cost_usd = (
+        str(cost["total_cost"])
+        if cost["total_cost"] is not None
+        else None
+    )
+
     logger.info(
-        "OpenAI API usage",
+        (
+            "OpenAI API usage: model=%s "
+            "input_tokens=%d "
+            "output_tokens=%d "
+            "total_tokens=%d "
+            "total_cost_usd=%s"
+        ),
+        model,
+        input_tokens,
+        output_tokens,
+        total_tokens,
+        total_cost_usd or "unknown",
         extra={
             "event": "openai_api_usage",
             "model": model,
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "total_tokens": total_tokens,
-            "input_cost_usd": (
-                str(cost["input_cost"])
-                if cost["input_cost"] is not None
-                else None
-            ),
-            "output_cost_usd": (
-                str(cost["output_cost"])
-                if cost["output_cost"] is not None
-                else None
-            ),
-            "total_cost_usd": (
-                str(cost["total_cost"])
-                if cost["total_cost"] is not None
-                else None
-            ),
-            "pricing_available": cost["total_cost"] is not None,
+            "input_cost_usd": input_cost_usd,
+            "output_cost_usd": output_cost_usd,
+            "total_cost_usd": total_cost_usd,
+            "pricing_available": total_cost_usd is not None,
+            "pricing_updated_at": MODEL_PRICING_UPDATED_AT,
         },
     )

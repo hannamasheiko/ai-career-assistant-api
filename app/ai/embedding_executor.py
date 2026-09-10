@@ -15,6 +15,7 @@ from app.core.exceptions import (
     AIServiceError,
     AITimeoutError,
 )
+from app.services.openai_cost_tracker import log_openai_usage
 
 
 logger = logging.getLogger(__name__)
@@ -76,5 +77,11 @@ async def create_embedding(text: str) -> list[float]:
         raise AIOutputValidationError(
             "OpenAI returned an embedding with an unexpected dimension."
         )
+    log_openai_usage(
+        model=settings.openai_embedding_model,
+        input_tokens=response.usage.prompt_tokens,
+        output_tokens=0,
+        total_tokens=response.usage.total_tokens,
+    )
 
     return embedding

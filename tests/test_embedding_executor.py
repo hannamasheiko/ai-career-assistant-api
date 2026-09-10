@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.core.exceptions import AIOutputValidationError
 
 
-def test_create_embedding_returns_vector(
+def test_create_embedding_returns_vector_and_logs_usage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -24,12 +24,21 @@ def test_create_embedding_returns_vector(
             SimpleNamespace(
                 embedding=expected_embedding,
             )
-        ]
+        ],
+        usage=SimpleNamespace(
+            prompt_tokens=120,
+            total_tokens=120,
+        ),
     )
 
-    with patch(
-        "app.ai.embedding_executor.AsyncOpenAI"
-    ) as openai_client_class:
+    with (
+        patch(
+            "app.ai.embedding_executor.AsyncOpenAI"
+        ) as openai_client_class,
+        patch(
+            "app.ai.embedding_executor.log_openai_usage"
+        ) as log_usage_mock,
+    ):
         client = openai_client_class.return_value
         client.embeddings.create = AsyncMock(
             return_value=response
@@ -48,6 +57,12 @@ def test_create_embedding_returns_vector(
         encoding_format="float",
     )
 
+    log_usage_mock.assert_called_once_with(
+        model="text-embedding-3-small",
+        input_tokens=120,
+        output_tokens=0,
+        total_tokens=120,
+    )
 
 def test_create_embedding_rejects_empty_text() -> None:
     with patch(
