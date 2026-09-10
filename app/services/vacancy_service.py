@@ -10,6 +10,13 @@ from app.ai.chains.analyze_vacancy_chain import analyze_vacancy_chain
 from app.ai.prompts.vacancy_analysis import (
     VACANCY_ANALYSIS_PROMPT_VERSION,
 )
+import logging
+from app.core.exceptions import AIServiceError
+from app.services.vacancy_embedding_service import (
+    create_or_update_vacancy_embedding,
+)
+
+logger = logging.getLogger(__name__)
 
 
 async def create_vacancy_from_text(
@@ -79,6 +86,21 @@ async def create_vacancy_analysis(
     db.add(vacancy_analysis)
     await db.commit()
     await db.refresh(vacancy_analysis)
+
+    try:
+        await create_or_update_vacancy_embedding(
+            db=db,
+            vacancy=vacancy,
+            vacancy_analysis=vacancy_analysis,
+        )
+    except AIServiceError:
+        logger.exception(
+            "Failed to create vacancy embedding.",
+            extra={
+                "vacancy_id": vacancy.id,
+                "vacancy_analysis_id": vacancy_analysis.id,
+            },
+        )
 
     return vacancy_analysis
 

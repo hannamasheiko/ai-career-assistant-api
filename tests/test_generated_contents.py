@@ -184,6 +184,10 @@ def mock_vacancy_analysis(monkeypatch) -> None:
             )
         ),
     )
+    monkeypatch.setattr(
+        "app.services.vacancy_service.create_or_update_vacancy_embedding",
+        AsyncMock(),
+    )
 
 
 def create_test_resume(client, auth_headers, monkeypatch) -> dict:

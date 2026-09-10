@@ -1,6 +1,8 @@
 import uuid
+from unittest.mock import AsyncMock
 
-from app.schemas.ai_outputs import ParsedVacancyDetails
+from app.core.exceptions import AIServiceError
+from app.schemas.ai_outputs import ParsedVacancyAnalysis, ParsedVacancyDetails
 
 
 VALID_VACANCY_TEXT = (
@@ -196,3 +198,96 @@ def test_vacancy_is_visible_to_another_authenticated_user(
 
     assert response.status_code == 200
     assert response.json() == created_vacancy
+
+
+def test_create_vacancy_analysis_creates_embedding(client, monkeypatch):
+    user_data = create_test_user(client)
+    auth_headers = get_auth_headers(client, user_data)
+    vacancy = create_test_vacancy(client, auth_headers, monkeypatch)
+
+    monkeypatch.setattr(
+        "app.services.vacancy_service.analyze_vacancy_chain",
+        AsyncMock(
+            return_value=ParsedVacancyAnalysis(
+                experience_level="middle",
+                english_level="B2",
+                required_skills=["Python", "FastAPI", "PostgreSQL"],
+                optional_skills=["Docker"],
+                responsibilities=["Develop backend APIs"],
+                red_flags=[],
+                green_flags=["Remote work"],
+                summary="Backend role with a Python-focused stack.",
+                recommendation="recommended",
+            )
+        ),
+    )
+    embedding_mock = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.vacancy_service.create_or_update_vacancy_embedding",
+        embedding_mock,
+    )
+
+    response = client.post(
+        f"/vacancies/{vacancy['id']}/analysis",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201
+
+    analysis = response.json()["analysis"]
+    embedding_mock.assert_awaited_once()
+    embedding_call = embedding_mock.await_args.kwargs
+
+    assert embedding_call["vacancy"].id == vacancy["id"]
+    assert embedding_call["vacancy_analysis"].id == analysis["id"]
+
+
+def test_embedding_failure_does_not_cancel_vacancy_analysis(
+    client,
+    monkeypatch,
+):
+    user_data = create_test_user(client)
+    auth_headers = get_auth_headers(client, user_data)
+    vacancy = create_test_vacancy(client, auth_headers, monkeypatch)
+
+    monkeypatch.setattr(
+        "app.services.vacancy_service.analyze_vacancy_chain",
+        AsyncMock(
+            return_value=ParsedVacancyAnalysis(
+                experience_level="middle",
+                english_level="B2",
+                required_skills=["Python", "FastAPI", "PostgreSQL"],
+                optional_skills=["Docker"],
+                responsibilities=["Develop backend APIs"],
+                red_flags=[],
+                green_flags=["Remote work"],
+                summary="Backend role with a Python-focused stack.",
+                recommendation="recommended",
+            )
+        ),
+    )
+    embedding_mock = AsyncMock(
+        side_effect=AIServiceError("Embedding provider failed"),
+    )
+    monkeypatch.setattr(
+        "app.services.vacancy_service.create_or_update_vacancy_embedding",
+        embedding_mock,
+    )
+
+    create_response = client.post(
+        f"/vacancies/{vacancy['id']}/analysis",
+        headers=auth_headers,
+    )
+
+    assert create_response.status_code == 201
+    embedding_mock.assert_awaited_once()
+
+    created_analysis = create_response.json()["analysis"]
+
+    get_response = client.get(
+        f"/vacancies/{vacancy['id']}/analysis",
+        headers=auth_headers,
+    )
+
+    assert get_response.status_code == 200
+    assert get_response.json()["id"] == created_analysis["id"]
