@@ -1,9 +1,14 @@
 import uuid
 from unittest.mock import AsyncMock
 
+from app.ai.context_builders.historical_application_context import (
+    NO_HISTORICAL_APPLICATIONS_CONTEXT,
+    build_historical_application_context,
+)
 from app.ai.prompts.content_generation import (
     GENERATED_CONTENT_PROMPT_VERSION,
 )
+from app.core.exceptions import AIPrerequisiteError
 from app.schemas.ai_outputs import (
     ParsedGeneratedContent,
     ParsedMatchAnalysis,
@@ -14,6 +19,9 @@ from app.schemas.ai_outputs import (
     ParsedVacancyDetails,
 )
 from app.schemas.cover_letter_strategy import CoverLetterStrategy
+from app.services.historical_application_retrieval_service import (
+    HistoricalApplicationMatch,
+)
 
 
 VALID_RESUME_TEXT = (
@@ -303,6 +311,7 @@ def prepare_generated_content_data(
 ) -> dict:
     """Create all persisted data required for generated content tests."""
 
+    mock_historical_application_retrieval(monkeypatch)
     user_data = create_test_user(client)
     auth_headers = get_auth_headers(client, user_data)
     profile = create_test_profile(client, auth_headers, user_data)
@@ -360,6 +369,19 @@ def mock_cover_letter_strategy(monkeypatch) -> AsyncMock:
     return strategy_mock
 
 
+def mock_historical_application_retrieval(monkeypatch) -> AsyncMock:
+    """Mock historical retrieval with no available applications."""
+
+    retrieval_mock = AsyncMock(return_value=[])
+    monkeypatch.setattr(
+        "app.services.generated_content_service."
+        "find_similar_historical_applications",
+        retrieval_mock,
+    )
+
+    return retrieval_mock
+
+
 def test_generate_cover_letter(client, monkeypatch):
     test_data = prepare_generated_content_data(client, monkeypatch)
     strategy_mock = mock_cover_letter_strategy(monkeypatch)
@@ -404,6 +426,9 @@ def test_generate_cover_letter(client, monkeypatch):
         resume_text=VALID_RESUME_TEXT,
         vacancy_text=VALID_VACANCY_TEXT,
         match_analysis_text="Match analysis is not available.",
+        historical_application_context=(
+            NO_HISTORICAL_APPLICATIONS_CONTEXT
+        ),
     )
 
     response_data = response.json()
@@ -440,6 +465,7 @@ def test_generate_cover_letter_uses_match_analysis(
         resume_text,
         vacancy_text,
         match_analysis_text,
+        historical_application_context,
     ):
         assert resume_text == VALID_RESUME_TEXT
         assert vacancy_text == VALID_VACANCY_TEXT
@@ -447,6 +473,9 @@ def test_generate_cover_letter_uses_match_analysis(
         assert "Recommendation: good_match" in match_analysis_text
         assert "Strong matches: Python, FastAPI" in match_analysis_text
         assert "Missing skills: Docker" in match_analysis_text
+        assert historical_application_context == (
+            NO_HISTORICAL_APPLICATIONS_CONTEXT
+        )
 
         return VALID_COVER_LETTER_STRATEGY
 
@@ -479,6 +508,150 @@ def test_generate_cover_letter_uses_match_analysis(
     assert response.json()["prompt_context"]["match_analysis_id"] == (
         test_data["match_analysis"]["id"]
     )
+
+
+def test_generate_cover_letter_passes_historical_application_context(
+    client,
+    monkeypatch,
+):
+    test_data = prepare_generated_content_data(client, monkeypatch)
+    historical_matches = [
+        HistoricalApplicationMatch(
+            interaction_id=101,
+            tracked_vacancy_id=201,
+            vacancy_id=301,
+            company_name="Historical Company",
+            position_title="Historical Python Developer",
+            vacancy_embedding_source_text=(
+                "Position title: Historical Python Developer\n"
+                "Required skills: Python; PostgreSQL"
+            ),
+            message_text="Previously sent cover letter text.",
+            similarity=0.91,
+        ),
+        HistoricalApplicationMatch(
+            interaction_id=102,
+            tracked_vacancy_id=202,
+            vacancy_id=302,
+            company_name="Another Company",
+            position_title="API Developer",
+            vacancy_embedding_source_text=(
+                "Position title: API Developer\n"
+                "Responsibilities: Develop APIs"
+            ),
+            message_text="Another actually sent message.",
+            similarity=0.82,
+        ),
+    ]
+    expected_context = build_historical_application_context(
+        historical_matches
+    )
+    retrieval_mock = AsyncMock(return_value=historical_matches)
+    strategy_mock = mock_cover_letter_strategy(monkeypatch)
+    generation_mock = AsyncMock(
+        return_value=ParsedGeneratedContent(
+            generated_text=GENERATED_COVER_LETTER,
+        )
+    )
+    monkeypatch.setattr(
+        "app.services.generated_content_service."
+        "find_similar_historical_applications",
+        retrieval_mock,
+    )
+    monkeypatch.setattr(
+        "app.services.generated_content_service.generate_content_chain",
+        generation_mock,
+    )
+
+    response = client.post(
+        "/tracked-vacancies/"
+        f"{test_data['tracked_vacancy']['id']}"
+        "/generated-content/generate",
+        headers=test_data["auth_headers"],
+        json=build_generation_request(),
+    )
+
+    assert response.status_code == 201
+    retrieval_mock.assert_awaited_once()
+    retrieval_kwargs = retrieval_mock.await_args.kwargs
+    assert "db" in retrieval_kwargs
+    assert retrieval_kwargs["user_id"] == test_data["profile"]["user_id"]
+    assert retrieval_kwargs["current_tracked_vacancy_id"] == (
+        test_data["tracked_vacancy"]["id"]
+    )
+    strategy_mock.assert_awaited_once_with(
+        resume_text=VALID_RESUME_TEXT,
+        vacancy_text=VALID_VACANCY_TEXT,
+        match_analysis_text="Match analysis is not available.",
+        historical_application_context=expected_context,
+    )
+    passed_context = strategy_mock.await_args.kwargs[
+        "historical_application_context"
+    ]
+    assert "Historical Company" in passed_context
+    assert "Historical Python Developer" in passed_context
+    assert "Required skills: Python; PostgreSQL" in passed_context
+    assert "Previously sent cover letter text." in passed_context
+    generation_mock.assert_awaited_once()
+
+
+def test_generate_cover_letter_falls_back_when_retrieval_unavailable(
+    client,
+    monkeypatch,
+):
+    test_data = prepare_generated_content_data(client, monkeypatch)
+    retrieval_mock = AsyncMock(
+        side_effect=AIPrerequisiteError(
+            "Vacancy embedding is required for retrieval"
+        )
+    )
+    strategy_mock = mock_cover_letter_strategy(monkeypatch)
+    generation_mock = AsyncMock(
+        return_value=ParsedGeneratedContent(
+            generated_text=GENERATED_COVER_LETTER,
+        )
+    )
+    monkeypatch.setattr(
+        "app.services.generated_content_service."
+        "find_similar_historical_applications",
+        retrieval_mock,
+    )
+    monkeypatch.setattr(
+        "app.services.generated_content_service.generate_content_chain",
+        generation_mock,
+    )
+
+    generation_path = (
+        "/tracked-vacancies/"
+        f"{test_data['tracked_vacancy']['id']}"
+        "/generated-content/generate"
+    )
+    response = client.post(
+        generation_path,
+        headers=test_data["auth_headers"],
+        json=build_generation_request(),
+    )
+
+    assert response.status_code == 201
+    retrieval_mock.assert_awaited_once()
+    strategy_mock.assert_awaited_once_with(
+        resume_text=VALID_RESUME_TEXT,
+        vacancy_text=VALID_VACANCY_TEXT,
+        match_analysis_text="Match analysis is not available.",
+        historical_application_context=(
+            NO_HISTORICAL_APPLICATIONS_CONTEXT
+        ),
+    )
+    generation_mock.assert_awaited_once()
+    assert response.json()["generated_text"] == GENERATED_COVER_LETTER
+
+    saved_content = client.get(
+        "/tracked-vacancies/generated-content/"
+        f"{response.json()['id']}",
+        headers=test_data["auth_headers"],
+    )
+    assert saved_content.status_code == 200
+    assert saved_content.json()["id"] == response.json()["id"]
 
 
 def test_get_generated_content_history_and_item(

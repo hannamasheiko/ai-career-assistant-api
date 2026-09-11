@@ -194,6 +194,7 @@ def test_ranks_limits_and_excludes_current_vacancy(
     assert results[0].vacancy_id == nearest_vacancy.id
     assert results[0].company_name == "Company nearest"
     assert results[0].position_title == "Position nearest"
+    assert results[0].vacancy_embedding_source_text == "Embedding input nearest"
     assert results[0].message_text == "Nearest message"
 
 

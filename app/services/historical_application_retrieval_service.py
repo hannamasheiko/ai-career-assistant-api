@@ -39,6 +39,7 @@ class HistoricalApplicationMatch:
 
     company_name: str | None
     position_title: str
+    vacancy_embedding_source_text: str
     message_text: str
 
     similarity: float
@@ -118,6 +119,9 @@ async def find_similar_historical_applications(
             Vacancy.id.label("vacancy_id"),
             Vacancy.company_name,
             Vacancy.position_title,
+            VacancyEmbedding.source_text.label(
+                "vacancy_embedding_source_text"
+            ),
             Interaction.message_text,
             similarity,
         )
@@ -179,6 +183,9 @@ async def find_similar_historical_applications(
             vacancy_id=row.vacancy_id,
             company_name=row.company_name,
             position_title=row.position_title,
+            vacancy_embedding_source_text=(
+                row.vacancy_embedding_source_text
+            ),
             message_text=row.message_text,
             similarity=float(row.similarity),
         )

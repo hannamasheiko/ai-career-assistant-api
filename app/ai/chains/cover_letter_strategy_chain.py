@@ -12,6 +12,7 @@ async def generate_cover_letter_strategy(
     resume_text: str,
     vacancy_text: str,
     match_analysis_text: str,
+    historical_application_context: str,
 ) -> CoverLetterStrategy:
     """Generate a structured cover letter strategy from raw input texts."""
 
@@ -28,6 +29,7 @@ async def generate_cover_letter_strategy(
             "resume_text": resume_text,
             "vacancy_text": vacancy_text,
             "match_analysis_text": match_analysis_text,
+            "historical_application_context": historical_application_context,
         },
         output_schema=CoverLetterStrategy,
         temperature=0,

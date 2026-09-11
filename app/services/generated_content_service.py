@@ -19,6 +19,13 @@ from app.ai.prompts.content_generation import (
     GENERATED_CONTENT_PROMPT_VERSION,
 )
 from app.core.config import settings
+from app.ai.context_builders.historical_application_context import (
+    build_historical_application_context,
+)
+from app.core.exceptions import AIPrerequisiteError
+from app.services.historical_application_retrieval_service import (
+    find_similar_historical_applications,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -179,6 +186,7 @@ async def generate_and_save_content(
     db: AsyncSession,
     tracked_vacancy: TrackedVacancy,
     data: GeneratedContentGenerateRequest,
+    user_id: int,
 ) -> GeneratedContent:
     """Generate AI content and save it to the database."""
 
@@ -205,10 +213,39 @@ async def generate_and_save_content(
         or "Match analysis is not available."
     )
 
+    try:
+        historical_matches = (
+            await find_similar_historical_applications(
+                db=db,
+                user_id=user_id,
+                current_tracked_vacancy_id=(
+                    tracked_vacancy.id
+                ),
+            )
+        )
+    except AIPrerequisiteError:
+        logger.info(
+            "Historical application retrieval is unavailable",
+            extra={
+                "event": (
+                    "historical_application_retrieval_unavailable"
+                ),
+                "tracked_vacancy_id": tracked_vacancy.id,
+            },
+        )
+        historical_matches = []
+
+    historical_application_context = (
+        build_historical_application_context(
+            matches=historical_matches,
+        )
+    )
+
     strategy = await generate_cover_letter_strategy(
         resume_text=resume_text,
         vacancy_text=vacancy_text,
         match_analysis_text=match_analysis_text,
+        historical_application_context=historical_application_context,
     )
 
     logger.info(

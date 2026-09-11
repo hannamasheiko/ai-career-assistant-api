@@ -53,6 +53,7 @@ async def generate_content_endpoint(
             db=db,
             tracked_vacancy=tracked_vacancy,
             data=data,
+            user_id=current_user.id,
         )
     except ValueError as error:
         raise HTTPException(
