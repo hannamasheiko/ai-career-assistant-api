@@ -24,6 +24,7 @@ from app.ai.context_builders.historical_application_context import (
 )
 from app.core.exceptions import AIPrerequisiteError
 from app.services.historical_application_retrieval_service import (
+    HistoricalApplicationMatch,
     find_similar_historical_applications,
 )
 
@@ -168,6 +169,7 @@ def build_prompt_context(
     tracked_vacancy: TrackedVacancy,
     match_analysis: MatchAnalysis | None,
     data: GeneratedContentGenerateRequest,
+    historical_matches: list[HistoricalApplicationMatch],
 ) -> dict[str, Any]:
     """Build prompt context snapshot for generated content."""
 
@@ -179,6 +181,15 @@ def build_prompt_context(
         "resume_document_id": tracked_vacancy.resume_document_id,
         "vacancy_id": tracked_vacancy.vacancy_id,
         "match_analysis_id": match_analysis.id if match_analysis else None,
+        "historical_application_matches": [
+            {
+                "interaction_id": match.interaction_id,
+                "tracked_vacancy_id": match.tracked_vacancy_id,
+                "vacancy_id": match.vacancy_id,
+                "similarity": match.similarity,
+            }
+            for match in historical_matches
+        ],
     }
 
 
@@ -276,6 +287,7 @@ async def generate_and_save_content(
             tracked_vacancy=tracked_vacancy,
             match_analysis=match_analysis,
             data=data,
+            historical_matches=historical_matches,
         ),
         generated_text=parsed_generated_content.generated_text,
         ai_model=settings.openai_model,

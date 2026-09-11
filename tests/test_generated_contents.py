@@ -453,6 +453,7 @@ def test_generate_cover_letter(client, monkeypatch):
     assert prompt_context["resume_document_id"] == test_data["resume"]["id"]
     assert prompt_context["vacancy_id"] == test_data["vacancy"]["id"]
     assert prompt_context["match_analysis_id"] is None
+    assert prompt_context["historical_application_matches"] == []
 
 
 def test_generate_cover_letter_uses_match_analysis(
@@ -553,6 +554,20 @@ def test_generate_cover_letter_passes_historical_application_context(
     expected_context = build_historical_application_context(
         historical_matches
     )
+    expected_metadata = [
+        {
+            "interaction_id": 101,
+            "tracked_vacancy_id": 201,
+            "vacancy_id": 301,
+            "similarity": 0.91,
+        },
+        {
+            "interaction_id": 102,
+            "tracked_vacancy_id": 202,
+            "vacancy_id": 302,
+            "similarity": 0.82,
+        },
+    ]
     retrieval_mock = AsyncMock(return_value=historical_matches)
     strategy_mock = mock_cover_letter_strategy(monkeypatch)
     generation_mock = AsyncMock(
@@ -609,6 +624,20 @@ def test_generate_cover_letter_passes_historical_application_context(
         tone="professional",
         extra_instructions="Keep it concise.",
     )
+    generated_content = response.json()
+    assert generated_content["prompt_context"][
+        "historical_application_matches"
+    ] == expected_metadata
+
+    persisted_response = client.get(
+        "/tracked-vacancies/generated-content/"
+        f"{generated_content['id']}",
+        headers=test_data["auth_headers"],
+    )
+    assert persisted_response.status_code == 200
+    assert persisted_response.json()["prompt_context"][
+        "historical_application_matches"
+    ] == expected_metadata
 
 
 def test_generate_cover_letter_falls_back_when_retrieval_unavailable(
@@ -671,6 +700,9 @@ def test_generate_cover_letter_falls_back_when_retrieval_unavailable(
         extra_instructions="Keep it concise.",
     )
     assert response.json()["generated_text"] == GENERATED_COVER_LETTER
+    assert response.json()["prompt_context"][
+        "historical_application_matches"
+    ] == []
 
     saved_content = client.get(
         "/tracked-vacancies/generated-content/"
@@ -679,6 +711,9 @@ def test_generate_cover_letter_falls_back_when_retrieval_unavailable(
     )
     assert saved_content.status_code == 200
     assert saved_content.json()["id"] == response.json()["id"]
+    assert saved_content.json()["prompt_context"][
+        "historical_application_matches"
+    ] == []
 
 
 def test_get_generated_content_history_and_item(
