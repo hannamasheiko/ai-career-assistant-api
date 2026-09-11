@@ -391,6 +391,7 @@ def test_generate_cover_letter(client, monkeypatch):
         resume_text,
         vacancy_text,
         strategy,
+        historical_application_context,
         language,
         tone,
         extra_instructions,
@@ -399,6 +400,9 @@ def test_generate_cover_letter(client, monkeypatch):
         assert resume_text == VALID_RESUME_TEXT
         assert vacancy_text == VALID_VACANCY_TEXT
         assert strategy is VALID_COVER_LETTER_STRATEGY
+        assert historical_application_context == (
+            NO_HISTORICAL_APPLICATIONS_CONTEXT
+        )
         assert language == "en"
         assert tone == "professional"
         assert extra_instructions == "Keep it concise."
@@ -481,6 +485,9 @@ def test_generate_cover_letter_uses_match_analysis(
 
     async def mock_generate_content_chain(**kwargs):
         assert kwargs["strategy"] is VALID_COVER_LETTER_STRATEGY
+        assert kwargs["historical_application_context"] == (
+            NO_HISTORICAL_APPLICATIONS_CONTEXT
+        )
         assert "match_analysis_text" not in kwargs
 
         return ParsedGeneratedContent(
@@ -592,7 +599,16 @@ def test_generate_cover_letter_passes_historical_application_context(
     assert "Historical Python Developer" in passed_context
     assert "Required skills: Python; PostgreSQL" in passed_context
     assert "Previously sent cover letter text." in passed_context
-    generation_mock.assert_awaited_once()
+    generation_mock.assert_awaited_once_with(
+        content_type="cover_letter",
+        resume_text=VALID_RESUME_TEXT,
+        vacancy_text=VALID_VACANCY_TEXT,
+        strategy=VALID_COVER_LETTER_STRATEGY,
+        historical_application_context=expected_context,
+        language="en",
+        tone="professional",
+        extra_instructions="Keep it concise.",
+    )
 
 
 def test_generate_cover_letter_falls_back_when_retrieval_unavailable(
@@ -642,7 +658,18 @@ def test_generate_cover_letter_falls_back_when_retrieval_unavailable(
             NO_HISTORICAL_APPLICATIONS_CONTEXT
         ),
     )
-    generation_mock.assert_awaited_once()
+    generation_mock.assert_awaited_once_with(
+        content_type="cover_letter",
+        resume_text=VALID_RESUME_TEXT,
+        vacancy_text=VALID_VACANCY_TEXT,
+        strategy=VALID_COVER_LETTER_STRATEGY,
+        historical_application_context=(
+            NO_HISTORICAL_APPLICATIONS_CONTEXT
+        ),
+        language="en",
+        tone="professional",
+        extra_instructions="Keep it concise.",
+    )
     assert response.json()["generated_text"] == GENERATED_COVER_LETTER
 
     saved_content = client.get(
@@ -691,6 +718,11 @@ def test_get_generated_content_history_and_item(
 
     assert first_response.status_code == 201
     assert second_response.status_code == 201
+    assert generation_mock.await_count == 2
+    for generation_call in generation_mock.await_args_list:
+        assert generation_call.kwargs[
+            "historical_application_context"
+        ] == NO_HISTORICAL_APPLICATIONS_CONTEXT
 
     first_content = first_response.json()
     second_content = second_response.json()
@@ -724,13 +756,14 @@ def test_update_generated_content(client, monkeypatch):
     test_data = prepare_generated_content_data(client, monkeypatch)
     mock_cover_letter_strategy(monkeypatch)
 
+    generation_mock = AsyncMock(
+        return_value=ParsedGeneratedContent(
+            generated_text=GENERATED_COVER_LETTER,
+        )
+    )
     monkeypatch.setattr(
         "app.services.generated_content_service.generate_content_chain",
-        AsyncMock(
-            return_value=ParsedGeneratedContent(
-                generated_text=GENERATED_COVER_LETTER,
-            )
-        ),
+        generation_mock,
     )
 
     create_response = client.post(
@@ -742,6 +775,9 @@ def test_update_generated_content(client, monkeypatch):
     )
 
     assert create_response.status_code == 201
+    assert generation_mock.await_args.kwargs[
+        "historical_application_context"
+    ] == NO_HISTORICAL_APPLICATIONS_CONTEXT
 
     created_content = create_response.json()
     update_response = client.patch(
@@ -845,6 +881,9 @@ def test_other_user_cannot_access_generated_content(
     assert patch_response.status_code == 404
     assert patch_response.json()["detail"] == "Generated content not found."
     assert generation_mock.await_count == 1
+    assert generation_mock.await_args.kwargs[
+        "historical_application_context"
+    ] == NO_HISTORICAL_APPLICATIONS_CONTEXT
     assert strategy_mock.await_count == 1
 
 

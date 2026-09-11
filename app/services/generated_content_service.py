@@ -263,6 +263,7 @@ async def generate_and_save_content(
         resume_text=resume_text,
         vacancy_text=vacancy_text,
         strategy=strategy,
+        historical_application_context=historical_application_context,
         language=data.language,
         tone=data.tone,
         extra_instructions=data.extra_instructions,

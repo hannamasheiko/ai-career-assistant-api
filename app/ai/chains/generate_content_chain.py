@@ -14,6 +14,7 @@ async def generate_content_chain(
     resume_text: str,
     vacancy_text: str,
     strategy: CoverLetterStrategy,
+    historical_application_context: str,
     language: str,
     tone: str | None,
     extra_instructions: str | None,
@@ -43,6 +44,7 @@ async def generate_content_chain(
             "primary_evidence": strategy.primary_evidence,
             "supporting_evidence": strategy.supporting_evidence,
             "positioning_strategy": strategy.positioning_strategy,
+            "historical_application_context": historical_application_context,
             "language": language,
             "tone": tone or "professional",
             "extra_instructions": (
