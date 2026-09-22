@@ -193,7 +193,12 @@ async def create_interaction(
         tracked_vacancy.applied_at = data.occurred_at
 
     if (
-        tracked_vacancy.status == TrackedVacancyStatus.RESUME_SENT
+        tracked_vacancy.status
+        in {
+            TrackedVacancyStatus.SAVED,
+            TrackedVacancyStatus.ANALYZED,
+            TrackedVacancyStatus.RESUME_SENT,
+        }
         and data.direction == InteractionDirection.INCOMING
         and data.interaction_type in {
             InteractionType.MESSAGE,

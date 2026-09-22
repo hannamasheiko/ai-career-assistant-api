@@ -690,6 +690,20 @@ def test_failed_resume_sent_creation_keeps_tracked_vacancy_unchanged(
             id="outgoing-call-keeps-status",
         ),
         pytest.param(
+            "saved",
+            "message",
+            "incoming",
+            "recruiter_contact",
+            id="incoming-message-advances-status-before-resume-sent",
+        ),
+        pytest.param(
+            "analyzed",
+            "call",
+            "incoming",
+            "recruiter_contact",
+            id="incoming-call-advances-status-before-resume-sent",
+        ),
+        pytest.param(
             "screening",
             "message",
             "incoming",
@@ -705,7 +719,7 @@ def test_failed_resume_sent_creation_keeps_tracked_vacancy_unchanged(
         ),
     ],
 )
-def test_meaningful_interaction_updates_only_resume_sent_status(
+def test_meaningful_interaction_advances_status_to_recruiter_contact(
     client,
     monkeypatch,
     initial_status,
