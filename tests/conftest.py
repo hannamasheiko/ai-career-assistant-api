@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -24,10 +25,19 @@ TEST_DATABASE_URL = settings.test_database_url
 if not TEST_DATABASE_URL:
     raise RuntimeError("TEST_DATABASE_URL is not configured")
 
-if "test" not in TEST_DATABASE_URL:
+if TEST_DATABASE_URL == settings.database_url:
+    raise RuntimeError(
+        "TEST_DATABASE_URL must differ from DATABASE_URL. "
+        "Running tests against the main database would drop its tables."
+    )
+
+_test_database_name = make_url(TEST_DATABASE_URL).database
+
+if not _test_database_name or "test" not in _test_database_name.split("_"):
     raise RuntimeError(
         "Tests must use a dedicated test database. "
-        "TEST_DATABASE_URL must contain 'test'."
+        "TEST_DATABASE_URL's database name must contain 'test' as its "
+        "own '_'-separated word (e.g. 'ai_career_test_db')."
     )
 
 

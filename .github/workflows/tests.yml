@@ -24,7 +24,7 @@ jobs:
           --health-retries=5
 
     env:
-      DATABASE_URL: postgresql+asyncpg://ai_career_user:ai_career_password@localhost:5432/ai_career_test_db
+      DATABASE_URL: postgresql+asyncpg://ai_career_user:ai_career_password@localhost:5432/ai_career_assistant_db
       TEST_DATABASE_URL: postgresql+asyncpg://ai_career_user:ai_career_password@localhost:5432/ai_career_test_db
       SECRET_KEY: test-secret-key-for-ci
       ALGORITHM: HS256
