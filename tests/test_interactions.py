@@ -848,7 +848,82 @@ def test_incoming_rejection_closes_active_tracked_vacancy(
         )
 
 
-def test_rejection_rejects_outgoing_direction(client, monkeypatch):
+@pytest.mark.parametrize(
+    "initial_status",
+    [
+        "resume_sent",
+        "recruiter_contact",
+        "screening",
+        "interview",
+        "test_task",
+        "offer",
+    ],
+)
+def test_outgoing_rejection_closes_active_tracked_vacancy(
+    client,
+    monkeypatch,
+    initial_status,
+):
+    """A candidate can decline an offer or withdraw after contact was made."""
+
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    unchanged_fields = {
+        "applied_at": "2026-08-10T09:00:00+00:00",
+        "next_action_at": "2026-08-30T09:00:00+00:00",
+    }
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={
+            "status": initial_status,
+            "priority": "high",
+            "decision": "interested",
+            **unchanged_fields,
+        },
+    )
+    assert update_response.status_code == 200
+    occurred_at = "2026-08-20T10:00:00+00:00"
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data={
+            "interaction_type": "rejection",
+            "direction": "outgoing",
+            "summary": "Candidate declined and withdrew from the process.",
+            "occurred_at": occurred_at,
+        },
+    )
+
+    assert interaction_response.status_code == 201
+    interaction_data = interaction_response.json()
+    assert interaction_data["interaction_type"] == "rejection"
+    assert interaction_data["direction"] == "outgoing"
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+
+    assert tracked_response.status_code == 200
+    tracked_data = tracked_response.json()
+    assert tracked_data["status"] == "rejected"
+    assert tracked_data["priority"] == "low"
+    assert tracked_data["decision"] == "not_interested"
+    assert datetime.fromisoformat(tracked_data["closed_at"]) == (
+        datetime.fromisoformat(occurred_at)
+    )
+    for field_name in ("applied_at", "next_action_at"):
+        assert datetime.fromisoformat(tracked_data[field_name]) == (
+            datetime.fromisoformat(unchanged_fields[field_name])
+        )
+
+
+def test_rejection_requires_direction(client, monkeypatch):
     auth_headers, tracked_vacancy = prepare_interaction_data(
         client,
         monkeypatch,
@@ -866,14 +941,13 @@ def test_rejection_rejects_outgoing_direction(client, monkeypatch):
         headers=auth_headers,
         data={
             "interaction_type": "rejection",
-            "direction": "outgoing",
             "occurred_at": "2026-08-20T10:00:00+00:00",
         },
     )
 
     assert interaction_response.status_code == 400
     assert interaction_response.json()["detail"] == (
-        "A rejection interaction must have incoming direction."
+        "A rejection interaction must have a direction."
     )
 
     tracked_response = client.get(

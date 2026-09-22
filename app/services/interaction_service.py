@@ -113,10 +113,10 @@ async def create_interaction(
 
     if (
         data.interaction_type == InteractionType.REJECTION
-        and data.direction != InteractionDirection.INCOMING
+        and data.direction is None
     ):
         raise InvalidInteractionError(
-            "A rejection interaction must have incoming direction."
+            "A rejection interaction must have a direction."
         )
 
     if (
