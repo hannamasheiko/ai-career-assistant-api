@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
@@ -20,43 +21,63 @@ from app.main import app as fastapi_app
 from app import models  # noqa: F401
 
 
+_test_engine: AsyncEngine | None = None
+_TestingSessionLocal: async_sessionmaker[AsyncSession] | None = None
 
-TEST_DATABASE_URL = settings.test_database_url
 
-if not TEST_DATABASE_URL:
-    raise RuntimeError("TEST_DATABASE_URL is not configured")
+def _get_test_engine() -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
+    """Validate TEST_DATABASE_URL and build the test engine on first use.
 
-if TEST_DATABASE_URL == settings.database_url:
-    raise RuntimeError(
-        "TEST_DATABASE_URL must differ from DATABASE_URL. "
-        "Running tests against the main database would drop its tables."
+    This runs lazily, only when a test actually needs the database (via
+    the `client` fixture) — not at import time for the whole `tests/`
+    directory. Pure-logic unit tests can then be collected and run
+    without TEST_DATABASE_URL configured at all.
+    """
+
+    global _test_engine, _TestingSessionLocal
+
+    if _test_engine is not None:
+        return _test_engine, _TestingSessionLocal
+
+    test_database_url = settings.test_database_url
+
+    if not test_database_url:
+        raise RuntimeError("TEST_DATABASE_URL is not configured")
+
+    if test_database_url == settings.database_url:
+        raise RuntimeError(
+            "TEST_DATABASE_URL must differ from DATABASE_URL. "
+            "Running tests against the main database would drop its tables."
+        )
+
+    test_database_name = make_url(test_database_url).database
+
+    if not test_database_name or "test" not in test_database_name.split("_"):
+        raise RuntimeError(
+            "Tests must use a dedicated test database. "
+            "TEST_DATABASE_URL's database name must contain 'test' as its "
+            "own '_'-separated word (e.g. 'ai_career_test_db')."
+        )
+
+    _test_engine = create_async_engine(
+        test_database_url,
+        pool_pre_ping=True,
+        poolclass=NullPool,
     )
 
-_test_database_name = make_url(TEST_DATABASE_URL).database
-
-if not _test_database_name or "test" not in _test_database_name.split("_"):
-    raise RuntimeError(
-        "Tests must use a dedicated test database. "
-        "TEST_DATABASE_URL's database name must contain 'test' as its "
-        "own '_'-separated word (e.g. 'ai_career_test_db')."
+    _TestingSessionLocal = async_sessionmaker(
+        bind=_test_engine,
+        class_=AsyncSession,
+        autoflush=False,
+        expire_on_commit=False,
     )
 
-
-test_engine = create_async_engine(
-    TEST_DATABASE_URL,
-    pool_pre_ping=True,
-    poolclass=NullPool,
-)
-
-TestingSessionLocal = async_sessionmaker(
-    bind=test_engine,
-    class_=AsyncSession,
-    autoflush=False,
-    expire_on_commit=False,
-)
+    return _test_engine, _TestingSessionLocal
 
 
 async def recreate_test_database() -> None:
+    test_engine, _ = _get_test_engine()
+
     async with test_engine.begin() as connection:
         await connection.execute(
             text("CREATE EXTENSION IF NOT EXISTS vector")
@@ -66,12 +87,16 @@ async def recreate_test_database() -> None:
 
 
 async def drop_test_database() -> None:
+    test_engine, _ = _get_test_engine()
+
     async with test_engine.begin() as connection:
         await connection.run_sync(Base.metadata.drop_all)
 
 
 async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with TestingSessionLocal() as session:
+    _, testing_session_local = _get_test_engine()
+
+    async with testing_session_local() as session:
         yield session
 
 
@@ -79,7 +104,8 @@ async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
 def testing_session_factory():
     """Provide the async test session factory."""
 
-    return TestingSessionLocal
+    _, testing_session_local = _get_test_engine()
+    return testing_session_local
 
 @pytest.fixture()
 def client():
