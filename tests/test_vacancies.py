@@ -88,6 +88,94 @@ def test_create_vacancy_from_text(client, monkeypatch):
     assert response_data["analysis"] is None
 
 
+def test_create_vacancy_from_text_with_analyze_true(client, monkeypatch):
+    user_data = create_test_user(client, prefix="vacancy")
+    auth_headers = get_auth_headers(client, user_data)
+    mock_vacancy_parser(monkeypatch)
+
+    monkeypatch.setattr(
+        "app.services.vacancy_service.analyze_vacancy_chain",
+        AsyncMock(
+            return_value=ParsedVacancyAnalysis(
+                experience_level="middle",
+                english_level="B2",
+                required_skills=["Python", "FastAPI", "PostgreSQL"],
+                optional_skills=["Docker"],
+                responsibilities=["Develop backend APIs"],
+                red_flags=[],
+                green_flags=["Remote work"],
+                summary="Backend role with a Python-focused stack.",
+                recommendation="recommended",
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.vacancy_service.create_or_update_vacancy_embedding",
+        AsyncMock(),
+    )
+
+    response = client.post(
+        "/vacancies/from-text",
+        params={"analyze": True},
+        headers={
+            **auth_headers,
+            "Content-Type": "text/plain",
+        },
+        content=VALID_VACANCY_TEXT,
+    )
+
+    assert response.status_code == 201
+
+    response_data = response.json()
+
+    assert response_data["vacancy"]["company_name"] == "Test Company"
+    assert response_data["analysis"] is not None
+    assert response_data["analysis"]["experience_level"] == "middle"
+
+
+def test_create_vacancy_from_text_returns_vacancy_when_analysis_fails(
+    client,
+    monkeypatch,
+):
+    user_data = create_test_user(client, prefix="vacancy")
+    auth_headers = get_auth_headers(client, user_data)
+    mock_vacancy_parser(monkeypatch)
+
+    monkeypatch.setattr(
+        "app.services.vacancy_service.analyze_vacancy_chain",
+        AsyncMock(side_effect=AIServiceError("AI analysis failed")),
+    )
+
+    response = client.post(
+        "/vacancies/from-text",
+        params={"analyze": True},
+        headers={
+            **auth_headers,
+            "Content-Type": "text/plain",
+        },
+        content=VALID_VACANCY_TEXT,
+    )
+
+    assert response.status_code == 201
+
+    response_data = response.json()
+
+    assert response_data["vacancy"]["company_name"] == "Test Company"
+    assert response_data["analysis"] is None
+
+    vacancy_id = response_data["vacancy"]["id"]
+
+    # The vacancy is not lost: a client can retrieve it and retry analysis
+    # separately instead of re-submitting the text and duplicating it.
+    get_response = client.get(
+        f"/vacancies/{vacancy_id}",
+        headers=auth_headers,
+    )
+
+    assert get_response.status_code == 200
+    assert get_response.json()["id"] == vacancy_id
+
+
 def test_create_vacancy_requires_authentication(client):
     response = client.post(
         "/vacancies/from-text",
