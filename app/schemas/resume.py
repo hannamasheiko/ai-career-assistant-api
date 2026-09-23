@@ -12,21 +12,6 @@ class ResumeSectionBase(BaseModel):
     order_index: int = Field(default=0, ge=0)
 
 
-class ResumeSectionCreate(ResumeSectionBase):
-    """Schema for creating a resume section."""
-
-    pass
-
-
-class ResumeSectionUpdate(BaseModel):
-    """Schema for updating a resume section."""
-
-    section_type: str | None = Field(default=None, max_length=100)
-    title: str | None = Field(default=None, max_length=255)
-    content: str | None = None
-    order_index: int | None = Field(default=None, ge=0)
-
-
 class ResumeSectionRead(ResumeSectionBase):
     """Schema for returning a resume section."""
 
@@ -44,13 +29,6 @@ class ResumeDocumentBase(BaseModel):
     source_type: str = Field(default="manual_text", max_length=100)
     raw_text: str
     is_active: bool = True
-
-
-class ResumeDocumentCreate(ResumeDocumentBase):
-    """Schema for creating a resume document."""
-
-    candidate_profile_id: int
-    sections: list[ResumeSectionCreate] | None = None
 
 
 class ResumeDocumentArchiveUpdate(BaseModel):
