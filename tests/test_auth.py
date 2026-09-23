@@ -1,29 +1,4 @@
-import uuid
-
-
-def create_test_user(client):
-    """
-    Create a unique test user through the registration endpoint.
-
-    This helper prepares a user for tests that require
-    an existing registered user.
-    """
-    unique_suffix = uuid.uuid4().hex[:8]
-
-    user_data = {
-        "username": f"testuser_{unique_suffix}",
-        "email": f"test_{unique_suffix}@example.com",
-        "password": "TestPassword123!",
-    }
-
-    response = client.post(
-        "/auth/register",
-        json=user_data,
-    )
-
-    assert response.status_code == 201
-
-    return user_data
+from tests.conftest import create_test_user
 
 
 def login_test_user(client, user_data):
@@ -69,7 +44,7 @@ def test_register_user(client):
 
 
 def test_login_user(client):
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="test")
 
     response = client.post(
         "/auth/login",
@@ -89,7 +64,7 @@ def test_login_user(client):
 
 
 def test_login_with_invalid_credentials(client):
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="test")
 
     response = client.post(
         "/auth/login",
@@ -107,7 +82,7 @@ def test_login_with_invalid_credentials(client):
 
 
 def test_get_current_user(client):
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="test")
     access_token = login_test_user(client, user_data)
 
     response = client.get(

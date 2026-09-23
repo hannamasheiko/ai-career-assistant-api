@@ -1,55 +1,15 @@
-import uuid
 from unittest.mock import AsyncMock
 
 from app.core.exceptions import AIServiceError
 from app.schemas.ai_outputs import ParsedVacancyAnalysis, ParsedVacancyDetails
+
+from tests.conftest import create_test_user, get_auth_headers
 
 
 VALID_VACANCY_TEXT = (
     "Python Backend Developer vacancy requiring FastAPI, PostgreSQL, "
     "SQLAlchemy, REST API experience and strong English skills."
 )
-
-
-def create_test_user(client) -> dict:
-    """Create and return a registered test user."""
-
-    unique_suffix = uuid.uuid4().hex[:8]
-
-    user_data = {
-        "username": f"vacancy_user_{unique_suffix}",
-        "email": f"vacancy_{unique_suffix}@example.com",
-        "password": "TestPassword123!",
-    }
-
-    response = client.post(
-        "/auth/register",
-        json=user_data,
-    )
-
-    assert response.status_code == 201
-
-    return user_data
-
-
-def get_auth_headers(client, user_data: dict) -> dict[str, str]:
-    """Log in a test user and return authorization headers."""
-
-    response = client.post(
-        "/auth/login",
-        data={
-            "username": user_data["username"],
-            "password": user_data["password"],
-        },
-    )
-
-    assert response.status_code == 200
-
-    access_token = response.json()["access_token"]
-
-    return {
-        "Authorization": f"Bearer {access_token}",
-    }
 
 
 def mock_vacancy_parser(monkeypatch):
@@ -98,7 +58,7 @@ def create_test_vacancy(client, auth_headers, monkeypatch) -> dict:
 
 
 def test_create_vacancy_from_text(client, monkeypatch):
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="vacancy")
     auth_headers = get_auth_headers(client, user_data)
     mock_vacancy_parser(monkeypatch)
 
@@ -139,7 +99,7 @@ def test_create_vacancy_requires_authentication(client):
 
 
 def test_get_vacancy_by_id(client, monkeypatch):
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="vacancy")
     auth_headers = get_auth_headers(client, user_data)
     created_vacancy = create_test_vacancy(
         client,
@@ -157,7 +117,7 @@ def test_get_vacancy_by_id(client, monkeypatch):
 
 
 def test_get_nonexistent_vacancy_returns_404(client):
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="vacancy")
     auth_headers = get_auth_headers(client, user_data)
 
     response = client.get(
@@ -179,7 +139,7 @@ def test_vacancy_is_visible_to_another_authenticated_user(
     client,
     monkeypatch,
 ):
-    first_user = create_test_user(client)
+    first_user = create_test_user(client, prefix="vacancy")
     first_user_headers = get_auth_headers(client, first_user)
 
     created_vacancy = create_test_vacancy(
@@ -188,7 +148,7 @@ def test_vacancy_is_visible_to_another_authenticated_user(
         monkeypatch,
     )
 
-    second_user = create_test_user(client)
+    second_user = create_test_user(client, prefix="vacancy")
     second_user_headers = get_auth_headers(client, second_user)
 
     response = client.get(
@@ -201,7 +161,7 @@ def test_vacancy_is_visible_to_another_authenticated_user(
 
 
 def test_create_vacancy_analysis_creates_embedding(client, monkeypatch):
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="vacancy")
     auth_headers = get_auth_headers(client, user_data)
     vacancy = create_test_vacancy(client, auth_headers, monkeypatch)
 
@@ -246,7 +206,7 @@ def test_embedding_failure_does_not_cancel_vacancy_analysis(
     client,
     monkeypatch,
 ):
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="vacancy")
     auth_headers = get_auth_headers(client, user_data)
     vacancy = create_test_vacancy(client, auth_headers, monkeypatch)
 

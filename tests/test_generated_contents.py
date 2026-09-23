@@ -1,4 +1,3 @@
-import uuid
 from unittest.mock import AsyncMock
 
 from app.ai.context_builders.historical_application_context import (
@@ -22,6 +21,8 @@ from app.schemas.cover_letter_strategy import CoverLetterStrategy
 from app.services.historical_application_retrieval_service import (
     HistoricalApplicationMatch,
 )
+
+from tests.conftest import create_test_user, get_auth_headers
 
 
 VALID_RESUME_TEXT = (
@@ -54,45 +55,6 @@ VALID_COVER_LETTER_STRATEGY = CoverLetterStrategy(
         "Present the backend experience as the primary professional angle."
     ),
 )
-
-
-def create_test_user(client) -> dict:
-    """Create and return a registered test user."""
-
-    unique_suffix = uuid.uuid4().hex[:8]
-
-    user_data = {
-        "username": f"content_user_{unique_suffix}",
-        "email": f"content_{unique_suffix}@example.com",
-        "password": "TestPassword123!",
-    }
-
-    response = client.post(
-        "/auth/register",
-        json=user_data,
-    )
-
-    assert response.status_code == 201
-
-    return user_data
-
-
-def get_auth_headers(client, user_data: dict) -> dict[str, str]:
-    """Log in a test user and return authorization headers."""
-
-    response = client.post(
-        "/auth/login",
-        data={
-            "username": user_data["username"],
-            "password": user_data["password"],
-        },
-    )
-
-    assert response.status_code == 200
-
-    return {
-        "Authorization": f"Bearer {response.json()['access_token']}",
-    }
 
 
 def create_test_profile(
@@ -312,7 +274,7 @@ def prepare_generated_content_data(
     """Create all persisted data required for generated content tests."""
 
     mock_historical_application_retrieval(monkeypatch)
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="content")
     auth_headers = get_auth_headers(client, user_data)
     profile = create_test_profile(client, auth_headers, user_data)
     resume = create_test_resume(client, auth_headers, monkeypatch)
@@ -876,7 +838,7 @@ def test_other_user_cannot_access_generated_content(
     assert create_response.status_code == 201
 
     generated_content = create_response.json()
-    other_user = create_test_user(client)
+    other_user = create_test_user(client, prefix="content")
     other_user_headers = get_auth_headers(client, other_user)
 
     generate_response = client.post(

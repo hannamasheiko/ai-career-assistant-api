@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock
 
@@ -13,6 +12,8 @@ from app.schemas.ai_outputs import (
     ParsedVacancyDetails,
 )
 
+from tests.conftest import create_test_user, get_auth_headers
+
 
 VALID_RESUME_TEXT = (
     "Python Backend Developer with commercial experience in FastAPI, "
@@ -23,45 +24,6 @@ VALID_VACANCY_TEXT = (
     "Python Backend Developer vacancy requiring FastAPI, PostgreSQL, "
     "SQLAlchemy, REST API experience and strong English skills."
 )
-
-
-def create_test_user(client) -> dict:
-    """Create and return a registered test user."""
-
-    unique_suffix = uuid.uuid4().hex[:8]
-
-    user_data = {
-        "username": f"match_user_{unique_suffix}",
-        "email": f"match_{unique_suffix}@example.com",
-        "password": "TestPassword123!",
-    }
-
-    response = client.post(
-        "/auth/register",
-        json=user_data,
-    )
-
-    assert response.status_code == 201
-
-    return user_data
-
-
-def get_auth_headers(client, user_data: dict) -> dict[str, str]:
-    """Log in a test user and return authorization headers."""
-
-    response = client.post(
-        "/auth/login",
-        data={
-            "username": user_data["username"],
-            "password": user_data["password"],
-        },
-    )
-
-    assert response.status_code == 200
-
-    return {
-        "Authorization": f"Bearer {response.json()['access_token']}",
-    }
 
 
 def create_test_profile(
@@ -258,7 +220,7 @@ def prepare_match_analysis_data(
 ) -> dict:
     """Create all persisted data required for match analysis tests."""
 
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="match")
     auth_headers = get_auth_headers(client, user_data)
     profile = create_test_profile(client, auth_headers, user_data)
     resume = create_test_resume(client, auth_headers, monkeypatch)
@@ -460,7 +422,7 @@ def test_other_user_cannot_access_match_analysis(
 
     assert create_response.status_code == 201
 
-    other_user = create_test_user(client)
+    other_user = create_test_user(client, prefix="match")
     other_user_headers = get_auth_headers(client, other_user)
     match_analysis_path = (
         "/tracked-vacancies/"

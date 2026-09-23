@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -93,3 +94,52 @@ def client():
     finally:
         fastapi_app.dependency_overrides.clear()
         asyncio.run(drop_test_database())
+
+
+# Shared test helpers (not fixtures: called directly with arguments from
+# inside test bodies, the same way each test file used to define them).
+
+def create_test_user(client, prefix: str = "user") -> dict:
+    """Create and return a registered test user.
+
+    `prefix` labels the username/email so users created by different test
+    files stay easy to tell apart in the database or logs, e.g.
+    `create_test_user(client, prefix="vacancy")` -> "vacancy_user_<suffix>".
+    """
+
+    unique_suffix = uuid.uuid4().hex[:8]
+
+    user_data = {
+        "username": f"{prefix}_user_{unique_suffix}",
+        "email": f"{prefix}_{unique_suffix}@example.com",
+        "password": "TestPassword123!",
+    }
+
+    response = client.post(
+        "/auth/register",
+        json=user_data,
+    )
+
+    assert response.status_code == 201
+
+    return user_data
+
+
+def get_auth_headers(client, user_data: dict) -> dict[str, str]:
+    """Log in a test user and return authorization headers."""
+
+    response = client.post(
+        "/auth/login",
+        data={
+            "username": user_data["username"],
+            "password": user_data["password"],
+        },
+    )
+
+    assert response.status_code == 200
+
+    access_token = response.json()["access_token"]
+
+    return {
+        "Authorization": f"Bearer {access_token}",
+    }

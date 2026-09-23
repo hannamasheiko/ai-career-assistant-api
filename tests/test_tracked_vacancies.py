@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 
 from app.schemas.ai_outputs import (
@@ -7,6 +6,8 @@ from app.schemas.ai_outputs import (
     ParsedResumeSection,
     ParsedVacancyDetails,
 )
+
+from tests.conftest import create_test_user, get_auth_headers
 
 
 VALID_RESUME_TEXT = (
@@ -18,47 +19,6 @@ VALID_VACANCY_TEXT = (
     "Python Backend Developer vacancy requiring FastAPI, PostgreSQL, "
     "SQLAlchemy, REST API experience and strong English skills."
 )
-
-
-def create_test_user(client) -> dict:
-    """Create and return a registered test user."""
-
-    unique_suffix = uuid.uuid4().hex[:8]
-
-    user_data = {
-        "username": f"tracked_user_{unique_suffix}",
-        "email": f"tracked_{unique_suffix}@example.com",
-        "password": "TestPassword123!",
-    }
-
-    response = client.post(
-        "/auth/register",
-        json=user_data,
-    )
-
-    assert response.status_code == 201
-
-    return user_data
-
-
-def get_auth_headers(client, user_data: dict) -> dict[str, str]:
-    """Log in a test user and return authorization headers."""
-
-    response = client.post(
-        "/auth/login",
-        data={
-            "username": user_data["username"],
-            "password": user_data["password"],
-        },
-    )
-
-    assert response.status_code == 200
-
-    access_token = response.json()["access_token"]
-
-    return {
-        "Authorization": f"Bearer {access_token}",
-    }
 
 
 def create_test_profile(
@@ -197,7 +157,7 @@ def create_test_tracked_vacancy(
 def prepare_tracked_vacancy_data(client, monkeypatch):
     """Create the authenticated user, resume, and global vacancy."""
 
-    user_data = create_test_user(client)
+    user_data = create_test_user(client, prefix="tracked")
     auth_headers = get_auth_headers(client, user_data)
     create_test_profile(client, auth_headers, user_data)
     resume = create_test_resume(client, auth_headers, monkeypatch)
@@ -254,7 +214,7 @@ def test_cannot_track_vacancy_with_another_users_resume(
         monkeypatch,
     )
 
-    second_user = create_test_user(client)
+    second_user = create_test_user(client, prefix="tracked")
     second_user_headers = get_auth_headers(client, second_user)
 
     response = client.post(
@@ -317,7 +277,7 @@ def test_user_can_only_get_own_tracked_vacancies(
         vacancy["id"],
     )
 
-    other_user = create_test_user(client)
+    other_user = create_test_user(client, prefix="tracked")
     other_user_headers = get_auth_headers(client, other_user)
 
     owner_list_response = client.get(
