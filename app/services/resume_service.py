@@ -1,6 +1,8 @@
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.ai.chains.parse_resume_chain import parse_resume_chain
 from app.core.config import settings
@@ -77,3 +79,42 @@ async def create_resume_from_text(
         await db.refresh(section)
 
     return resume_document, resume_analysis, resume_sections
+
+
+async def get_resume_documents_for_user(
+    db: AsyncSession,
+    user_id: int,
+) -> list[ResumeDocument]:
+    """Get all resume documents for current user."""
+
+    result = await db.execute(
+        select(ResumeDocument)
+        .where(
+            ResumeDocument.candidate_profile.has(user_id=user_id)
+        )
+        .order_by(ResumeDocument.created_at.desc())
+    )
+
+    return list(result.scalars().all())
+
+
+async def get_resume_document_with_details_for_user(
+    db: AsyncSession,
+    resume_document_id: int,
+    user_id: int,
+) -> ResumeDocument | None:
+    """Get resume document with analysis and sections if it belongs to current user."""
+
+    result = await db.execute(
+        select(ResumeDocument)
+        .options(
+            selectinload(ResumeDocument.analysis),
+            selectinload(ResumeDocument.sections),
+        )
+        .where(
+            ResumeDocument.id == resume_document_id,
+            ResumeDocument.candidate_profile.has(user_id=user_id),
+        )
+    )
+
+    return result.scalar_one_or_none()

@@ -1,6 +1,11 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 from app.core.exceptions import AIServiceError
+from app.schemas.ai_outputs import (
+    ParsedResume,
+    ParsedResumeAnalysis,
+    ParsedResumeSection,
+)
 from fastapi import status
 
 from tests.conftest import create_test_user, get_auth_headers
@@ -94,6 +99,65 @@ def build_mock_resume_result(
     ]
 
     return resume_document, resume_analysis, resume_sections
+
+
+def mock_resume_parser(monkeypatch) -> None:
+    """Mock AI resume parsing with deterministic structured data."""
+
+    async def mock_parse_resume_chain(raw_text: str):
+        return ParsedResume(
+            resume_analysis=ParsedResumeAnalysis(
+                full_name="Resume Test Candidate",
+                target_role="Python Backend Developer",
+                skills=["Python", "FastAPI", "PostgreSQL"],
+                summary="Python backend developer.",
+            ),
+            sections=[
+                ParsedResumeSection(
+                    section_type="summary",
+                    title="Summary",
+                    content="Python backend developer.",
+                    order_index=0,
+                ),
+                ParsedResumeSection(
+                    section_type="skills",
+                    title="Skills",
+                    content="Python, FastAPI, PostgreSQL",
+                    order_index=1,
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(
+        "app.services.resume_service.parse_resume_chain",
+        mock_parse_resume_chain,
+    )
+
+
+def create_test_resume(
+    client,
+    auth_headers: dict[str, str],
+    monkeypatch,
+    *,
+    file_name: str | None = None,
+) -> dict:
+    """Create and return a persisted resume document with mocked AI parsing."""
+
+    mock_resume_parser(monkeypatch)
+
+    response = client.post(
+        "/resumes/from-text",
+        params={"file_name": file_name} if file_name else {},
+        headers={
+            **auth_headers,
+            "Content-Type": "text/plain",
+        },
+        content=VALID_RESUME_TEXT,
+    )
+
+    assert response.status_code == 201
+
+    return response.json()["resume_document"]
 
 
 def test_create_resume_from_text(client, monkeypatch):
@@ -278,3 +342,126 @@ def test_create_resume_returns_503_when_ai_service_fails(
     assert response.json() == {
         "detail": "AI service is temporarily unavailable. Please try again later."
     }
+
+
+def test_get_resume_documents_returns_own_resumes(client, monkeypatch):
+    user_data = create_test_user(client, prefix="resume")
+    auth_headers = get_auth_headers(client, user_data)
+    create_test_profile(client, auth_headers, user_data)
+
+    first_resume = create_test_resume(
+        client, auth_headers, monkeypatch, file_name="first.txt"
+    )
+    second_resume = create_test_resume(
+        client, auth_headers, monkeypatch, file_name="second.txt"
+    )
+
+    response = client.get("/resumes", headers=auth_headers)
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+
+    assert len(response_data) == 2
+    assert {resume["id"] for resume in response_data} == {
+        first_resume["id"],
+        second_resume["id"],
+    }
+    # Newest resume document comes first.
+    assert response_data[0]["id"] == second_resume["id"]
+    assert response_data[1]["id"] == first_resume["id"]
+
+
+def test_get_resume_documents_requires_authentication(client):
+    response = client.get("/resumes")
+
+    assert response.status_code == 401
+
+
+def test_get_resume_documents_excludes_other_users_resumes(
+    client,
+    monkeypatch,
+):
+    user_data = create_test_user(client, prefix="resume")
+    auth_headers = get_auth_headers(client, user_data)
+    create_test_profile(client, auth_headers, user_data)
+    create_test_resume(client, auth_headers, monkeypatch)
+
+    other_user = create_test_user(client, prefix="resume")
+    other_auth_headers = get_auth_headers(client, other_user)
+    create_test_profile(client, other_auth_headers, other_user)
+
+    response = client.get("/resumes", headers=other_auth_headers)
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_resume_document_by_id(client, monkeypatch):
+    user_data = create_test_user(client, prefix="resume")
+    auth_headers = get_auth_headers(client, user_data)
+    create_test_profile(client, auth_headers, user_data)
+    created_resume = create_test_resume(
+        client, auth_headers, monkeypatch, file_name="my_resume.txt"
+    )
+
+    response = client.get(
+        f"/resumes/{created_resume['id']}",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+
+    assert response_data["resume_document"]["id"] == created_resume["id"]
+    assert response_data["resume_document"]["file_name"] == "my_resume.txt"
+    assert response_data["resume_analysis"]["resume_document_id"] == (
+        created_resume["id"]
+    )
+    assert response_data["resume_analysis"]["target_role"] == (
+        "Python Backend Developer"
+    )
+    assert [
+        section["order_index"]
+        for section in response_data["resume_sections"]
+    ] == [0, 1]
+
+
+def test_get_resume_document_requires_authentication(client):
+    response = client.get("/resumes/1")
+
+    assert response.status_code == 401
+
+
+def test_get_nonexistent_resume_document_returns_404(client):
+    user_data = create_test_user(client, prefix="resume")
+    auth_headers = get_auth_headers(client, user_data)
+
+    response = client.get("/resumes/999999", headers=auth_headers)
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Resume document not found."
+
+
+def test_get_resume_document_returns_404_for_other_users_resume(
+    client,
+    monkeypatch,
+):
+    owner_data = create_test_user(client, prefix="resume")
+    owner_auth_headers = get_auth_headers(client, owner_data)
+    create_test_profile(client, owner_auth_headers, owner_data)
+    created_resume = create_test_resume(
+        client, owner_auth_headers, monkeypatch
+    )
+
+    other_user = create_test_user(client, prefix="resume")
+    other_auth_headers = get_auth_headers(client, other_user)
+
+    response = client.get(
+        f"/resumes/{created_resume['id']}",
+        headers=other_auth_headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Resume document not found."
