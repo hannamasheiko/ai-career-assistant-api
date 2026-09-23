@@ -2,14 +2,18 @@ import logging
 
 from openai import (
     APIConnectionError,
+    APIStatusError,
     APITimeoutError,
     AsyncOpenAI,
+    AuthenticationError,
     InternalServerError,
+    PermissionDeniedError,
     RateLimitError,
 )
 
 from app.core.config import settings
 from app.core.exceptions import (
+    AIConfigurationError,
     AIOutputValidationError,
     AIRateLimitError,
     AIServiceError,
@@ -30,7 +34,7 @@ async def create_embedding(text: str) -> list[float]:
         raise ValueError("Embedding input must not be empty")
 
     if not settings.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is not configured")
+        raise AIConfigurationError("OPENAI_API_KEY is not configured")
 
     client = AsyncOpenAI(
         api_key=settings.openai_api_key,
@@ -61,6 +65,22 @@ async def create_embedding(text: str) -> list[float]:
     except (APIConnectionError, InternalServerError) as exc:
         logger.exception(
             "OpenAI embedding service is temporarily unavailable."
+        )
+        raise AIServiceError(
+            "AI embedding service is temporarily unavailable."
+        ) from exc
+
+    except (AuthenticationError, PermissionDeniedError) as exc:
+        logger.exception(
+            "OpenAI embedding request rejected the request credentials."
+        )
+        raise AIConfigurationError(
+            "AI provider credentials are invalid or missing."
+        ) from exc
+
+    except APIStatusError as exc:
+        logger.exception(
+            "OpenAI embedding request failed with a provider error."
         )
         raise AIServiceError(
             "AI embedding service is temporarily unavailable."

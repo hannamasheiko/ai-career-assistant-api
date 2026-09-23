@@ -1,12 +1,18 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
+from openai import AuthenticationError, BadRequestError
 from pydantic import BaseModel
 
 import app.ai.llm_executor as llm_executor_module
 from app.ai.llm_executor import invoke_structured_llm
-from app.core.exceptions import AIOutputValidationError
+from app.core.exceptions import (
+    AIConfigurationError,
+    AIOutputValidationError,
+    AIServiceError,
+)
 
 
 pytestmark = pytest.mark.anyio
@@ -24,6 +30,28 @@ class FakeChain:
     async def ainvoke(self, input_data: dict) -> dict:
         self.received_input = input_data
         return self.result
+
+
+class RaisingFakeChain:
+    def __init__(self, exc: Exception):
+        self.exc = exc
+
+    async def ainvoke(self, input_data: dict) -> dict:
+        raise self.exc
+
+
+def build_openai_status_error(
+    error_class: type[Exception],
+    message: str,
+    status_code: int,
+) -> Exception:
+    request = httpx.Request(
+        "POST",
+        "https://api.openai.com/v1/chat/completions",
+    )
+    response = httpx.Response(status_code=status_code, request=request)
+
+    return error_class(message, response=response, body=None)
 
 
 class FakePrompt:
@@ -129,7 +157,7 @@ async def test_invoke_structured_llm_raises_when_api_key_is_missing(
     prompt = FakePrompt(chain)
 
     with pytest.raises(
-        RuntimeError,
+        AIConfigurationError,
         match="OPENAI_API_KEY is not configured",
     ):
         await invoke_structured_llm(
@@ -139,6 +167,71 @@ async def test_invoke_structured_llm_raises_when_api_key_is_missing(
         )
 
     chat_openai_mock.assert_not_called()
+
+
+async def test_invoke_structured_llm_raises_configuration_error_on_auth_failure(
+    monkeypatch,
+) -> None:
+    configure_openai_settings(monkeypatch)
+
+    original_error = build_openai_status_error(
+        AuthenticationError,
+        "Invalid API key",
+        status_code=401,
+    )
+    chain = RaisingFakeChain(original_error)
+    prompt = FakePrompt(chain)
+
+    llm_mock = MagicMock()
+    llm_mock.with_structured_output.return_value = object()
+
+    monkeypatch.setattr(
+        llm_executor_module,
+        "ChatOpenAI",
+        MagicMock(return_value=llm_mock),
+    )
+
+    with pytest.raises(AIConfigurationError) as exc_info:
+        await invoke_structured_llm(
+            prompt=prompt,
+            input_data={"text": "test input"},
+            output_schema=StructuredOutputFixture,
+        )
+
+    assert exc_info.value.__cause__ is original_error
+
+
+async def test_invoke_structured_llm_raises_service_error_on_other_provider_errors(
+    monkeypatch,
+) -> None:
+    configure_openai_settings(monkeypatch)
+
+    original_error = build_openai_status_error(
+        BadRequestError,
+        "Invalid request",
+        status_code=400,
+    )
+    chain = RaisingFakeChain(original_error)
+    prompt = FakePrompt(chain)
+
+    llm_mock = MagicMock()
+    llm_mock.with_structured_output.return_value = object()
+
+    monkeypatch.setattr(
+        llm_executor_module,
+        "ChatOpenAI",
+        MagicMock(return_value=llm_mock),
+    )
+
+    with pytest.raises(AIServiceError) as exc_info:
+        await invoke_structured_llm(
+            prompt=prompt,
+            input_data={"text": "test input"},
+            output_schema=StructuredOutputFixture,
+        )
+
+    assert exc_info.value.__cause__ is original_error
+    assert not isinstance(exc_info.value, AIConfigurationError)
 
 
 async def test_invoke_structured_llm_raises_when_parsing_fails(

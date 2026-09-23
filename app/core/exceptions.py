@@ -13,5 +13,8 @@ class AIRateLimitError(AIServiceError):
 class AIOutputValidationError(AIServiceError):
     """AI output could not be validated against the expected schema."""
 
+class AIConfigurationError(AIServiceError):
+    """AI provider credentials or configuration are invalid or missing."""
+
 class AIPrerequisiteError(Exception):
     """Required data for an AI operation is missing."""

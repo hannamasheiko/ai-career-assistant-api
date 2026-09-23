@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.core.exceptions import (
+    AIConfigurationError,
     AIOutputValidationError,
     AIPrerequisiteError,
     AIRateLimitError,
@@ -56,6 +57,18 @@ async def ai_service_exception_handler(
         },
     )
 
+
+async def ai_configuration_exception_handler(
+    request: Request,
+    exc: AIConfigurationError,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "AI service is not configured correctly. Please contact the administrator.",
+        },
+    )
+
 async def ai_prerequisite_exception_handler(
     request: Request,
     exc: AIPrerequisiteError,
@@ -83,6 +96,10 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(
         AIServiceError,
         ai_service_exception_handler,
+    )
+    app.add_exception_handler(
+        AIConfigurationError,
+        ai_configuration_exception_handler,
     )
     app.add_exception_handler(
         AIPrerequisiteError,

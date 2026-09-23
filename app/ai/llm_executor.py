@@ -9,11 +9,15 @@ from app.services.openai_cost_tracker import log_openai_usage
 
 from openai import (
     APIConnectionError,
+    APIStatusError,
     APITimeoutError,
+    AuthenticationError,
     InternalServerError,
+    PermissionDeniedError,
     RateLimitError,
 )
 from app.core.exceptions import (
+    AIConfigurationError,
     AIOutputValidationError,
     AIRateLimitError,
     AIServiceError,
@@ -40,7 +44,7 @@ async def invoke_structured_llm(
     error_message: str = "Failed to parse structured AI output",
 ) -> StructuredOutputT:
     if not settings.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is not configured")
+        raise AIConfigurationError("OPENAI_API_KEY is not configured")
 
     llm = ChatOpenAI(
         model=settings.openai_model,
@@ -69,6 +73,16 @@ async def invoke_structured_llm(
 
     except (APIConnectionError, InternalServerError) as exc:
         logger.exception("OpenAI service is temporarily unavailable.")
+        raise AIServiceError("AI service is temporarily unavailable.") from exc
+
+    except (AuthenticationError, PermissionDeniedError) as exc:
+        logger.exception("OpenAI rejected the request credentials.")
+        raise AIConfigurationError(
+            "AI provider credentials are invalid or missing."
+        ) from exc
+
+    except APIStatusError as exc:
+        logger.exception("OpenAI request failed with a provider error.")
         raise AIServiceError("AI service is temporarily unavailable.") from exc
 
     parsed_result = result["parsed"]
