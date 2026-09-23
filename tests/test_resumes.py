@@ -308,6 +308,25 @@ def test_create_resume_rejects_too_short_text(client):
     assert response.status_code == 422
 
 
+def test_create_resume_rejects_too_long_text(client):
+    user_data = create_test_user(client, prefix="resume")
+    auth_headers = get_auth_headers(client, user_data)
+    create_test_profile(client, auth_headers, user_data)
+
+    too_long_text = "a" * 15001
+
+    response = client.post(
+        "/resumes/from-text",
+        headers={
+            **auth_headers,
+            "Content-Type": "text/plain",
+        },
+        content=too_long_text,
+    )
+
+    assert response.status_code == 422
+
+
 def test_create_resume_returns_503_when_ai_service_fails(
     client,
     monkeypatch,

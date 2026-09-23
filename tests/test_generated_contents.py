@@ -914,3 +914,25 @@ def test_generate_content_rejects_unsupported_type(
     )
     generation_mock.assert_not_awaited()
     strategy_mock.assert_not_awaited()
+
+
+def test_generate_content_rejects_too_long_extra_instructions(
+    client,
+    monkeypatch,
+):
+    test_data = prepare_generated_content_data(client, monkeypatch)
+
+    response = client.post(
+        "/tracked-vacancies/"
+        f"{test_data['tracked_vacancy']['id']}"
+        "/generated-content/generate",
+        headers=test_data["auth_headers"],
+        json={
+            "content_type": "cover_letter",
+            "language": "en",
+            "tone": "professional",
+            "extra_instructions": "a" * 2001,
+        },
+    )
+
+    assert response.status_code == 422

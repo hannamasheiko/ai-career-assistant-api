@@ -31,6 +31,7 @@ async def create_resume_from_plain_text(
         ...,
         media_type="text/plain",
         min_length=50,
+        max_length=15000,
         description="Plain resume text copied directly from a document.",
     ),
     file_name: str | None = Query(

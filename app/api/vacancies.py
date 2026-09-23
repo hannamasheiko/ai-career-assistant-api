@@ -34,7 +34,12 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
 )
 async def create_vacancy_from_plain_text(
-    raw_text: str = Body(..., media_type="text/plain"),
+    raw_text: str = Body(
+        ...,
+        media_type="text/plain",
+        min_length=50,
+        max_length=20000,
+    ),
     analyze: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

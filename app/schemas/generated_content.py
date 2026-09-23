@@ -10,7 +10,7 @@ class GeneratedContentGenerateRequest(BaseModel):
     content_type: str = Field(..., max_length=100)
     language: str = Field(default="uk", max_length=20)
     tone: str | None = Field(default="professional", max_length=100)
-    extra_instructions: str | None = None
+    extra_instructions: str | None = Field(default=None, max_length=2000)
 
 
 class GeneratedContentUpdate(BaseModel):

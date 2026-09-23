@@ -88,6 +88,40 @@ def test_create_vacancy_from_text(client, monkeypatch):
     assert response_data["analysis"] is None
 
 
+def test_create_vacancy_rejects_too_short_text(client):
+    user_data = create_test_user(client, prefix="vacancy")
+    auth_headers = get_auth_headers(client, user_data)
+
+    response = client.post(
+        "/vacancies/from-text",
+        headers={
+            **auth_headers,
+            "Content-Type": "text/plain",
+        },
+        content="Too short vacancy text.",
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_vacancy_rejects_too_long_text(client):
+    user_data = create_test_user(client, prefix="vacancy")
+    auth_headers = get_auth_headers(client, user_data)
+
+    too_long_text = "a" * 20001
+
+    response = client.post(
+        "/vacancies/from-text",
+        headers={
+            **auth_headers,
+            "Content-Type": "text/plain",
+        },
+        content=too_long_text,
+    )
+
+    assert response.status_code == 422
+
+
 def test_create_vacancy_from_text_with_analyze_true(client, monkeypatch):
     user_data = create_test_user(client, prefix="vacancy")
     auth_headers = get_auth_headers(client, user_data)
