@@ -4,13 +4,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.resume import ResumeDocumentRead
+from app.schemas.resume import ResumeDocumentArchiveUpdate, ResumeDocumentRead
 from app.schemas.resume_ingestion import ResumeIngestionResponse
 from app.services.candidate_profile_service import get_candidate_profile_by_user_id
 from app.services.resume_service import (
     create_resume_from_text,
+    get_resume_document_for_user,
     get_resume_document_with_details_for_user,
     get_resume_documents_for_user,
+    update_resume_document,
 )
 
 router = APIRouter(
@@ -116,3 +118,40 @@ async def get_resume_document(
             key=lambda section: section.order_index,
         ),
     )
+
+
+@router.patch(
+    "/{resume_document_id}",
+    response_model=ResumeDocumentRead,
+)
+async def update_resume_document_endpoint(
+    resume_document_id: int,
+    data: ResumeDocumentArchiveUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ResumeDocumentRead:
+    """Archive or unarchive a resume document for current authenticated user.
+
+    This is the only mutable field on a resume document — see
+    ResumeDocumentArchiveUpdate for why its content stays immutable.
+    """
+
+    resume_document = await get_resume_document_for_user(
+        db=db,
+        resume_document_id=resume_document_id,
+        user_id=current_user.id,
+    )
+
+    if resume_document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume document not found.",
+        )
+
+    updated_resume_document = await update_resume_document(
+        db=db,
+        resume_document=resume_document,
+        data=data,
+    )
+
+    return updated_resume_document

@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.models.candidate_profile import CandidateProfile
 from app.models.resume import ResumeDocument, ResumeSection
 from app.models.resume_analysis import ResumeAnalysis
+from app.schemas.resume import ResumeDocumentArchiveUpdate
 from app.services.experience_calculator import calculate_years_of_experience
 from app.ai.prompts.resume_parsing import RESUME_PARSING_PROMPT_VERSION
 
@@ -118,3 +119,39 @@ async def get_resume_document_with_details_for_user(
     )
 
     return result.scalar_one_or_none()
+
+
+async def get_resume_document_for_user(
+    db: AsyncSession,
+    resume_document_id: int,
+    user_id: int,
+) -> ResumeDocument | None:
+    """Get resume document if it belongs to current user."""
+
+    result = await db.execute(
+        select(ResumeDocument).where(
+            ResumeDocument.id == resume_document_id,
+            ResumeDocument.candidate_profile.has(user_id=user_id),
+        )
+    )
+
+    return result.scalar_one_or_none()
+
+
+async def update_resume_document(
+    db: AsyncSession,
+    resume_document: ResumeDocument,
+    data: ResumeDocumentArchiveUpdate,
+) -> ResumeDocument:
+    """Update resume document archival state.
+
+    This only ever changes is_active. Resume content is immutable, see
+    ResumeDocumentArchiveUpdate for why.
+    """
+
+    resume_document.is_active = data.is_active
+
+    await db.commit()
+    await db.refresh(resume_document)
+
+    return resume_document

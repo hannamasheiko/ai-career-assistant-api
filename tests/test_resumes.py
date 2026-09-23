@@ -465,3 +465,100 @@ def test_get_resume_document_returns_404_for_other_users_resume(
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Resume document not found."
+
+
+def test_archive_resume_document(client, monkeypatch):
+    user_data = create_test_user(client, prefix="resume")
+    auth_headers = get_auth_headers(client, user_data)
+    create_test_profile(client, auth_headers, user_data)
+    created_resume = create_test_resume(client, auth_headers, monkeypatch)
+
+    assert created_resume["is_active"] is True
+
+    response = client.patch(
+        f"/resumes/{created_resume['id']}",
+        headers=auth_headers,
+        json={"is_active": False},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["is_active"] is False
+
+    get_response = client.get(
+        f"/resumes/{created_resume['id']}",
+        headers=auth_headers,
+    )
+
+    assert get_response.status_code == 200
+    assert get_response.json()["resume_document"]["is_active"] is False
+
+
+def test_unarchive_resume_document(client, monkeypatch):
+    user_data = create_test_user(client, prefix="resume")
+    auth_headers = get_auth_headers(client, user_data)
+    create_test_profile(client, auth_headers, user_data)
+    created_resume = create_test_resume(client, auth_headers, monkeypatch)
+
+    archive_response = client.patch(
+        f"/resumes/{created_resume['id']}",
+        headers=auth_headers,
+        json={"is_active": False},
+    )
+    assert archive_response.status_code == 200
+    assert archive_response.json()["is_active"] is False
+
+    unarchive_response = client.patch(
+        f"/resumes/{created_resume['id']}",
+        headers=auth_headers,
+        json={"is_active": True},
+    )
+
+    assert unarchive_response.status_code == 200
+    assert unarchive_response.json()["is_active"] is True
+
+
+def test_update_resume_document_requires_authentication(client):
+    response = client.patch(
+        "/resumes/1",
+        json={"is_active": False},
+    )
+
+    assert response.status_code == 401
+
+
+def test_update_nonexistent_resume_document_returns_404(client):
+    user_data = create_test_user(client, prefix="resume")
+    auth_headers = get_auth_headers(client, user_data)
+
+    response = client.patch(
+        "/resumes/999999",
+        headers=auth_headers,
+        json={"is_active": False},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Resume document not found."
+
+
+def test_update_resume_document_returns_404_for_other_users_resume(
+    client,
+    monkeypatch,
+):
+    owner_data = create_test_user(client, prefix="resume")
+    owner_auth_headers = get_auth_headers(client, owner_data)
+    create_test_profile(client, owner_auth_headers, owner_data)
+    created_resume = create_test_resume(
+        client, owner_auth_headers, monkeypatch
+    )
+
+    other_user = create_test_user(client, prefix="resume")
+    other_auth_headers = get_auth_headers(client, other_user)
+
+    response = client.patch(
+        f"/resumes/{created_resume['id']}",
+        headers=other_auth_headers,
+        json={"is_active": False},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Resume document not found."

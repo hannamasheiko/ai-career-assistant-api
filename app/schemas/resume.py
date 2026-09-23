@@ -53,14 +53,18 @@ class ResumeDocumentCreate(ResumeDocumentBase):
     sections: list[ResumeSectionCreate] | None = None
 
 
-class ResumeDocumentUpdate(BaseModel):
-    """Schema for updating a resume document."""
+class ResumeDocumentArchiveUpdate(BaseModel):
+    """Update a resume document's archival state.
 
-    file_name: str | None = Field(default=None, max_length=255)
-    file_type: str | None = Field(default=None, max_length=100)
-    source_type: str | None = Field(default=None, max_length=100)
-    raw_text: str | None = None
-    is_active: bool | None = None
+    This is the only mutable field on a resume document — its content
+    (raw_text, file_name, etc.) is immutable once created, because resume
+    analysis, match analysis and generated content are derived from that
+    exact text. Setting is_active=False marks the resume document as
+    archived (an older, no-longer-used version); it does not affect any
+    data already generated from it.
+    """
+
+    is_active: bool
 
 
 class ResumeDocumentRead(ResumeDocumentBase):
