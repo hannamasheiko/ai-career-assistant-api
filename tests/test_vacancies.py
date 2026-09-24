@@ -220,6 +220,74 @@ def test_create_vacancy_requires_authentication(client):
     assert response.status_code == 401
 
 
+def test_get_vacancies_returns_all(client, monkeypatch):
+    user_data = create_test_user(client, prefix="vacancy")
+    auth_headers = get_auth_headers(client, user_data)
+
+    first_vacancy = create_test_vacancy(client, auth_headers, monkeypatch)
+    second_vacancy = create_test_vacancy(client, auth_headers, monkeypatch)
+
+    response = client.get("/vacancies", headers=auth_headers)
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+
+    assert len(response_data) == 2
+    assert {vacancy["id"] for vacancy in response_data} == {
+        first_vacancy["id"],
+        second_vacancy["id"],
+    }
+    # Newest vacancy comes first.
+    assert response_data[0]["id"] == second_vacancy["id"]
+    assert response_data[1]["id"] == first_vacancy["id"]
+
+    # The list is a lightweight summary, not the full vacancy.
+    assert "raw_text" not in response_data[0]
+    assert "cleaned_text" not in response_data[0]
+    assert "source_url" not in response_data[0]
+    assert "salary_min" not in response_data[0]
+    assert "salary_max" not in response_data[0]
+    assert "currency" not in response_data[0]
+    assert "created_at" not in response_data[0]
+
+    assert response_data[0]["company_name"] == "Test Company"
+    assert response_data[0]["position_title"] == (
+        "Python Backend Developer"
+    )
+    assert response_data[0]["source"] == "company_site"
+    assert response_data[0]["location"] == "Kyiv"
+    assert response_data[0]["work_format"] == "remote"
+    assert response_data[0]["employment_type"] == "full-time"
+
+
+def test_get_vacancies_requires_authentication(client):
+    response = client.get("/vacancies")
+
+    assert response.status_code == 401
+
+
+def test_get_vacancies_visible_to_another_authenticated_user(
+    client,
+    monkeypatch,
+):
+    owner_data = create_test_user(client, prefix="vacancy")
+    owner_auth_headers = get_auth_headers(client, owner_data)
+    created_vacancy = create_test_vacancy(
+        client, owner_auth_headers, monkeypatch
+    )
+
+    other_user = create_test_user(client, prefix="vacancy")
+    other_auth_headers = get_auth_headers(client, other_user)
+
+    response = client.get("/vacancies", headers=other_auth_headers)
+
+    assert response.status_code == 200
+    assert created_vacancy["id"] in {
+        vacancy["id"] for vacancy in response.json()
+    }
+
+
 def test_get_vacancy_by_id(client, monkeypatch):
     user_data = create_test_user(client, prefix="vacancy")
     auth_headers = get_auth_headers(client, user_data)

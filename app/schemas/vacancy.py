@@ -3,6 +3,30 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+class VacancySummaryResponse(BaseModel):
+    """Lightweight response schema for browsing the shared vacancy catalog.
+
+    Only the fields useful for scanning the list at a glance — company,
+    role, where it was found, and where/how the work happens. Everything
+    else (salary, source_url, raw_text, cleaned_text, timestamps) stays in
+    GET /vacancies/{id}.
+    """
+
+    id: int
+
+    company_name: str | None
+    position_title: str | None
+
+    source: str | None
+
+    location: str | None
+    work_format: str | None
+    employment_type: str | None
+
+    model_config = {
+        "from_attributes": True,
+    }
+
 class VacancyResponse(BaseModel):
     """Response schema for vacancy data."""
 

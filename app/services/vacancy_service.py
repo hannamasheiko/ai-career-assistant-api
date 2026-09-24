@@ -104,6 +104,17 @@ async def create_vacancy_analysis(
 
     return vacancy_analysis
 
+async def get_vacancies(
+    db: AsyncSession,
+) -> list[Vacancy]:
+    """Get all vacancies from the shared global catalog."""
+
+    result = await db.execute(
+        select(Vacancy).order_by(Vacancy.created_at.desc())
+    )
+
+    return list(result.scalars().all())
+
 async def get_vacancy_by_id(
     db: AsyncSession,
     vacancy_id: int,

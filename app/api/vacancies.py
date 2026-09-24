@@ -12,10 +12,12 @@ from app.schemas.vacancy import (
     VacancyAnalysisResponse,
     VacancyIngestionResponse,
     VacancyResponse,
+    VacancySummaryResponse,
 )
 from app.services.vacancy_service import (
     create_vacancy_analysis,
     create_vacancy_from_text,
+    get_vacancies,
     get_vacancy_by_id,
     get_latest_vacancy_analysis,
 )
@@ -76,6 +78,21 @@ async def create_vacancy_from_plain_text(
         vacancy=vacancy,
         analysis=analysis,
     )
+
+@router.get(
+    "",
+    response_model=list[VacancySummaryResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_vacancies_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[VacancySummaryResponse]:
+    """Return all vacancies from the shared global catalog."""
+
+    vacancies = await get_vacancies(db=db)
+
+    return vacancies
 
 @router.get(
     "/{vacancy_id}",
