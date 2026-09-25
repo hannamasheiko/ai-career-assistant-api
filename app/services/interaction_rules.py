@@ -137,7 +137,9 @@ TRANSITION_RULES: tuple[TransitionRule, ...] = (
         to_status=Status.RESUME_SENT,
     ),
     TransitionRule(
-        interaction_types=frozenset({Type.MESSAGE, Type.CALL}),
+        interaction_types=frozenset(
+            {Type.MESSAGE, Type.CALL, Type.INTERVIEW_INVITATION}
+        ),
         directions=frozenset({Direction.INCOMING}),
         from_statuses=frozenset(
             {Status.SAVED, Status.ANALYZED, Status.RESUME_SENT}
@@ -147,7 +149,14 @@ TRANSITION_RULES: tuple[TransitionRule, ...] = (
     TransitionRule(
         interaction_types=frozenset({Type.SCREENING_QUESTIONS}),
         directions=frozenset({Direction.INCOMING}),
-        from_statuses=frozenset({Status.RESUME_SENT, Status.RECRUITER_CONTACT}),
+        from_statuses=frozenset(
+            {
+                Status.SAVED,
+                Status.ANALYZED,
+                Status.RESUME_SENT,
+                Status.RECRUITER_CONTACT,
+            }
+        ),
         to_status=Status.SCREENING,
     ),
     TransitionRule(
@@ -174,6 +183,8 @@ TRANSITION_RULES: tuple[TransitionRule, ...] = (
         directions=frozenset({Direction.INCOMING}),
         from_statuses=frozenset(
             {
+                Status.SAVED,
+                Status.ANALYZED,
                 Status.RESUME_SENT,
                 Status.RECRUITER_CONTACT,
                 Status.SCREENING,

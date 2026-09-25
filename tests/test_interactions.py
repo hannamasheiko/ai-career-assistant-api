@@ -1107,8 +1107,8 @@ def test_failed_rejection_keeps_tracked_vacancy_unchanged(
         pytest.param(
             "saved",
             "incoming",
-            "saved",
-            id="screening-does-not-skip-application",
+            "screening",
+            id="saved-advances-to-screening",
         ),
         pytest.param(
             "interview",
@@ -1403,6 +1403,24 @@ def test_interview_events_do_not_change_ineligible_statuses(
             "incoming",
             "offer",
             id="test-task-does-not-roll-back-offer",
+        ),
+        pytest.param(
+            "saved",
+            "incoming",
+            "test_task",
+            id="incoming-test-task-advances-saved",
+        ),
+        pytest.param(
+            "analyzed",
+            "incoming",
+            "test_task",
+            id="incoming-test-task-advances-analyzed",
+        ),
+        pytest.param(
+            "saved",
+            "outgoing",
+            "saved",
+            id="outgoing-test-task-keeps-saved",
         ),
     ],
 )
@@ -1807,3 +1825,77 @@ def test_terminal_tracked_vacancy_accepts_history_only_interactions(
     )
 
     assert tracked_response.json()["status"] == terminal_status
+
+
+@pytest.mark.parametrize(
+    ("initial_status", "direction", "expected_status"),
+    [
+        pytest.param(
+            "saved",
+            "incoming",
+            "recruiter_contact",
+            id="invitation-is-first-contact-from-saved",
+        ),
+        pytest.param(
+            "analyzed",
+            "incoming",
+            "recruiter_contact",
+            id="invitation-is-first-contact-from-analyzed",
+        ),
+        pytest.param(
+            "resume_sent",
+            "incoming",
+            "recruiter_contact",
+            id="invitation-is-first-contact-from-resume-sent",
+        ),
+        pytest.param(
+            "saved",
+            "outgoing",
+            "saved",
+            id="outgoing-invitation-keeps-status",
+        ),
+        pytest.param(
+            "screening",
+            "incoming",
+            "screening",
+            id="invitation-does-not-roll-back-screening",
+        ),
+    ],
+)
+def test_incoming_interview_invitation_is_first_contact(
+    client,
+    monkeypatch,
+    initial_status,
+    direction,
+    expected_status,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={"status": initial_status},
+    )
+    assert update_response.status_code == 200
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data={
+            "interaction_type": "interview_invitation",
+            "direction": direction,
+            "occurred_at": "2026-08-20T10:00:00+00:00",
+        },
+    )
+
+    assert interaction_response.status_code == 201
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+
+    assert tracked_response.json()["status"] == expected_status
