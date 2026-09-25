@@ -93,12 +93,27 @@ def test_find_direction_violation(interaction_type, direction, has_violation):
         (Type.REJECTION, Status.RESUME_SENT, False),
         (Type.REJECTION, Status.OFFER, False),
         (Type.REJECTION, Status.REJECTED, True),
-        (Type.OFFER, Status.SAVED, False),
+        (Type.OFFER, Status.SAVED, True),
+        (Type.OFFER, Status.ANALYZED, True),
+        (Type.OFFER, Status.RESUME_SENT, False),
         (Type.OFFER, Status.INTERVIEW, False),
         (Type.OFFER, Status.REJECTED, True),
         (Type.OFFER, Status.DISCARDED, True),
         (Type.OFFER, Status.CLOSED, True),
-        (Type.MESSAGE, Status.CLOSED, False),
+        (Type.OFFER_DISCUSSION, Status.SAVED, True),
+        (Type.OFFER_DISCUSSION, Status.ANALYZED, True),
+        (Type.OFFER_DISCUSSION, Status.OFFER, False),
+        (Type.OFFER_DISCUSSION, Status.CLOSED, True),
+        (Type.HR_INTERVIEW, Status.SAVED, True),
+        (Type.TECHNICAL_INTERVIEW, Status.ANALYZED, True),
+        (Type.FINAL_INTERVIEW, Status.RESUME_SENT, False),
+        (Type.HR_INTERVIEW, Status.RECRUITER_CONTACT, False),
+        (Type.HR_INTERVIEW, Status.OFFER, False),
+        (Type.HR_INTERVIEW, Status.REJECTED, True),
+        (Type.MESSAGE, Status.SAVED, False),
+        (Type.CALL, Status.CLOSED, False),
+        (Type.FEEDBACK, Status.REJECTED, False),
+        (Type.FEEDBACK, Status.SAVED, False),
     ],
 )
 def test_find_status_violation(interaction_type, status, has_violation):
@@ -113,4 +128,39 @@ def test_status_violation_message_names_the_current_status():
     assert violation == (
         "A rejection interaction cannot be created for a tracked "
         "vacancy with status saved."
+    )
+
+
+@pytest.mark.parametrize("status", [Status.REJECTED, Status.DISCARDED, Status.CLOSED])
+@pytest.mark.parametrize(
+    "interaction_type",
+    [
+        Type.RESUME_SENT,
+        Type.SCREENING_QUESTIONS,
+        Type.INTERVIEW_INVITATION,
+        Type.HR_INTERVIEW,
+        Type.TECHNICAL_INTERVIEW,
+        Type.FINAL_INTERVIEW,
+        Type.TEST_TASK,
+        Type.OFFER_DISCUSSION,
+        Type.OFFER,
+        Type.REJECTION,
+    ],
+)
+def test_terminal_status_blocks_progress_interactions(status, interaction_type):
+    assert find_status_violation(interaction_type, status) is not None
+
+
+@pytest.mark.parametrize("status", [Status.REJECTED, Status.DISCARDED, Status.CLOSED])
+@pytest.mark.parametrize("interaction_type", [Type.MESSAGE, Type.CALL, Type.FEEDBACK])
+def test_terminal_status_allows_history_only_interactions(status, interaction_type):
+    assert find_status_violation(interaction_type, status) is None
+
+
+def test_terminal_status_violation_message_asks_to_reopen():
+    violation = find_status_violation(Type.TEST_TASK, Status.CLOSED)
+
+    assert violation == (
+        "Only message, call and feedback interactions can be added to a "
+        "tracked vacancy with status closed. Reopen the tracked vacancy first."
     )

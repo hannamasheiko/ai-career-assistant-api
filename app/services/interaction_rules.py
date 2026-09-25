@@ -28,9 +28,9 @@ class DirectionRule:
 
 @dataclass(frozen=True)
 class StatusRule:
-    """Tracked vacancy statuses an interaction type may be created from."""
+    """Tracked vacancy statuses interaction types may be created from."""
 
-    interaction_type: InteractionType
+    interaction_types: frozenset[InteractionType]
     allowed_statuses: frozenset[TrackedVacancyStatus]
     error_message: str
 
@@ -67,31 +67,63 @@ DIRECTION_RULES: tuple[DirectionRule, ...] = (
 )
 
 
+# Statuses reached only after the first real contact with the company.
+ACTIVE_STATUSES = frozenset(
+    {
+        Status.RESUME_SENT,
+        Status.RECRUITER_CONTACT,
+        Status.SCREENING,
+        Status.INTERVIEW,
+        Status.TEST_TASK,
+        Status.OFFER,
+    }
+)
+
+TERMINAL_STATUSES = frozenset(
+    {Status.REJECTED, Status.DISCARDED, Status.CLOSED}
+)
+
+# On a terminal tracked vacancy only these can still be added to the history.
+TERMINAL_ALLOWED_TYPES = frozenset(
+    {Type.MESSAGE, Type.CALL, Type.FEEDBACK}
+)
+
+TERMINAL_STATUS_ERROR_MESSAGE = (
+    "Only message, call and feedback interactions can be added to a tracked "
+    "vacancy with status {status}. Reopen the tracked vacancy first."
+)
+
+
 STATUS_RULES: tuple[StatusRule, ...] = (
     StatusRule(
-        interaction_type=Type.REJECTION,
-        allowed_statuses=frozenset(
-            {
-                Status.RESUME_SENT,
-                Status.RECRUITER_CONTACT,
-                Status.SCREENING,
-                Status.INTERVIEW,
-                Status.TEST_TASK,
-                Status.OFFER,
-            }
-        ),
+        interaction_types=frozenset({Type.REJECTION}),
+        allowed_statuses=ACTIVE_STATUSES,
         error_message=(
             "A rejection interaction cannot be created for a tracked "
             "vacancy with status {status}."
         ),
     ),
     StatusRule(
-        interaction_type=Type.OFFER,
-        allowed_statuses=frozenset(Status)
-        - {Status.REJECTED, Status.DISCARDED, Status.CLOSED},
+        interaction_types=frozenset({Type.OFFER}),
+        allowed_statuses=ACTIVE_STATUSES,
         error_message=(
             "An offer interaction cannot be created for a tracked "
             "vacancy with status {status}."
+        ),
+    ),
+    StatusRule(
+        interaction_types=frozenset(
+            {
+                Type.OFFER_DISCUSSION,
+                Type.HR_INTERVIEW,
+                Type.TECHNICAL_INTERVIEW,
+                Type.FINAL_INTERVIEW,
+            }
+        ),
+        allowed_statuses=ACTIVE_STATUSES,
+        error_message=(
+            "A {interaction_type} interaction cannot be created for a "
+            "tracked vacancy with status {status}."
         ),
     ),
 )
@@ -204,9 +236,18 @@ def find_status_violation(
     """Return an error message if the status does not allow this interaction."""
 
     for rule in STATUS_RULES:
-        if rule.interaction_type == interaction_type:
+        if interaction_type in rule.interaction_types:
             if status not in rule.allowed_statuses:
-                return rule.error_message.format(status=status)
+                return rule.error_message.format(
+                    status=status,
+                    interaction_type=interaction_type,
+                )
+
+    if (
+        status in TERMINAL_STATUSES
+        and interaction_type not in TERMINAL_ALLOWED_TYPES
+    ):
+        return TERMINAL_STATUS_ERROR_MESSAGE.format(status=status)
 
     return None
 

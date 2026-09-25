@@ -1314,19 +1314,9 @@ def test_interview_event_keeps_existing_interview_status(
     ("initial_status", "interaction_type"),
     [
         pytest.param(
-            "saved",
-            "hr_interview",
-            id="interview-does-not-skip-application",
-        ),
-        pytest.param(
             "offer",
             "technical_interview",
             id="interview-does-not-roll-back-offer",
-        ),
-        pytest.param(
-            "closed",
-            "final_interview",
-            id="interview-does-not-reopen-closed-status",
         ),
     ],
 )
@@ -1495,11 +1485,6 @@ def test_test_task_interactions_update_only_eligible_statuses(
         pytest.param("interview", "offer", id="offer-after-interview"),
         pytest.param("test_task", "offer", id="offer-after-test-task"),
         pytest.param("offer", "offer", id="revised-offer-keeps-status"),
-        pytest.param(
-            "saved",
-            "saved",
-            id="offer-does-not-skip-application",
-        ),
     ],
 )
 def test_incoming_offer_updates_only_eligible_statuses(
@@ -1663,3 +1648,162 @@ def test_offer_does_not_overwrite_terminal_status(
     assert tracked_response.json()["status"] == terminal_status
     assert interactions_response.status_code == 200
     assert interactions_response.json() == []
+
+
+@pytest.mark.parametrize(
+    ("initial_status", "interaction_type", "direction"),
+    [
+        ("saved", "hr_interview", None),
+        ("saved", "offer", "incoming"),
+        ("analyzed", "offer_discussion", None),
+    ],
+)
+def test_progress_interactions_require_first_contact(
+    client,
+    monkeypatch,
+    initial_status,
+    interaction_type,
+    direction,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={"status": initial_status},
+    )
+    assert update_response.status_code == 200
+
+    form_data = {
+        "interaction_type": interaction_type,
+        "occurred_at": "2026-08-20T10:00:00+00:00",
+    }
+    if direction is not None:
+        form_data["direction"] = direction
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data=form_data,
+    )
+
+    assert interaction_response.status_code == 409
+    assert "cannot be created" in interaction_response.json()["detail"]
+    assert initial_status in interaction_response.json()["detail"]
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+    interactions_response = client.get(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+    )
+
+    assert tracked_response.json()["status"] == initial_status
+    assert interactions_response.json() == []
+
+
+@pytest.mark.parametrize(
+    ("terminal_status", "interaction_type", "direction"),
+    [
+        ("rejected", "test_task", "incoming"),
+        ("discarded", "hr_interview", None),
+        ("closed", "resume_sent", "outgoing"),
+    ],
+)
+def test_terminal_tracked_vacancy_rejects_progress_interactions(
+    client,
+    monkeypatch,
+    terminal_status,
+    interaction_type,
+    direction,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={"status": terminal_status},
+    )
+    assert update_response.status_code == 200
+
+    form_data = {
+        "interaction_type": interaction_type,
+        "occurred_at": "2026-08-20T10:00:00+00:00",
+    }
+    if direction is not None:
+        form_data["direction"] = direction
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data=form_data,
+    )
+
+    assert interaction_response.status_code == 409
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+    interactions_response = client.get(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+    )
+
+    assert tracked_response.json()["status"] == terminal_status
+    assert interactions_response.json() == []
+
+
+@pytest.mark.parametrize(
+    ("terminal_status", "interaction_type", "direction"),
+    [
+        ("rejected", "message", "incoming"),
+        ("discarded", "call", "incoming"),
+        ("closed", "feedback", "incoming"),
+    ],
+)
+def test_terminal_tracked_vacancy_accepts_history_only_interactions(
+    client,
+    monkeypatch,
+    terminal_status,
+    interaction_type,
+    direction,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
+    update_response = client.patch(
+        tracked_vacancy_path,
+        headers=auth_headers,
+        json={"status": terminal_status},
+    )
+    assert update_response.status_code == 200
+
+    interaction_response = client.post(
+        f"{tracked_vacancy_path}/interactions",
+        headers=auth_headers,
+        data={
+            "interaction_type": interaction_type,
+            "direction": direction,
+            "occurred_at": "2026-08-20T10:00:00+00:00",
+        },
+    )
+
+    assert interaction_response.status_code == 201
+
+    tracked_response = client.get(
+        tracked_vacancy_path,
+        headers=auth_headers,
+    )
+
+    assert tracked_response.json()["status"] == terminal_status
