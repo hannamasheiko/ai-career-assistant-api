@@ -311,10 +311,9 @@ def test_update_interaction(client, monkeypatch):
         tracked_vacancy["id"],
     )
     update_data = {
-        "interaction_type": "call",
-        "direction": "incoming",
         "message_text": "Recruiter called to discuss the position.",
         "summary": "Introductory recruiter call.",
+        "occurred_at": "2026-08-19T11:00:00+00:00",
     }
 
     response = client.patch(
@@ -324,10 +323,13 @@ def test_update_interaction(client, monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json()["interaction_type"] == "call"
-    assert response.json()["direction"] == "incoming"
+    assert response.json()["interaction_type"] == interaction["interaction_type"]
+    assert response.json()["direction"] == interaction["direction"]
     assert response.json()["message_text"] == update_data["message_text"]
     assert response.json()["summary"] == update_data["summary"]
+    assert datetime.fromisoformat(response.json()["occurred_at"]) == (
+        datetime.fromisoformat(update_data["occurred_at"])
+    )
 
     get_response = client.get(
         f"/tracked-vacancies/interactions/{interaction['id']}",
@@ -335,8 +337,47 @@ def test_update_interaction(client, monkeypatch):
     )
 
     assert get_response.status_code == 200
-    assert get_response.json()["interaction_type"] == "call"
+    assert get_response.json()["interaction_type"] == interaction["interaction_type"]
     assert get_response.json()["summary"] == update_data["summary"]
+
+
+@pytest.mark.parametrize(
+    "forbidden_field",
+    [
+        {"interaction_type": "call"},
+        {"direction": "incoming"},
+        {"summary": "Changed.", "direction": "outgoing"},
+    ],
+)
+def test_update_interaction_rejects_type_and_direction(
+    client,
+    monkeypatch,
+    forbidden_field,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(
+        client,
+        monkeypatch,
+    )
+    interaction = create_test_interaction(
+        client,
+        auth_headers,
+        tracked_vacancy["id"],
+    )
+
+    response = client.patch(
+        f"/tracked-vacancies/interactions/{interaction['id']}",
+        headers=auth_headers,
+        json=forbidden_field,
+    )
+
+    assert response.status_code == 422
+
+    get_response = client.get(
+        f"/tracked-vacancies/interactions/{interaction['id']}",
+        headers=auth_headers,
+    )
+
+    assert get_response.json() == interaction
 
 
 def test_other_user_cannot_access_interactions(client, monkeypatch):

@@ -158,7 +158,11 @@ async def update_interaction_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> InteractionResponse:
-    """Update interaction for current user."""
+    """Update interaction for current user.
+
+    Only summary, message_text and occurred_at can be changed; sending any
+    other field (including interaction_type and direction) returns 422.
+    """
 
     interaction = await get_interaction_for_user(
         db=db,

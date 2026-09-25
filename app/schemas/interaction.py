@@ -20,10 +20,13 @@ class InteractionCreate(BaseModel):
 
 
 class InteractionUpdate(BaseModel):
-    """Schema for updating an interaction."""
+    """Schema for updating an interaction.
 
-    interaction_type: InteractionType | None = None
-    direction: InteractionDirection | None = None
+    interaction_type and direction are not editable: they drive the tracked
+    vacancy status, so a wrong one is fixed by recreating the interaction.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     message_text: str | None = None
     summary: str | None = None
