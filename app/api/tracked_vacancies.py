@@ -10,6 +10,7 @@ from app.schemas.tracked_vacancy import (
     TrackedVacancyUpdate,
 )
 from app.services.tracked_vacancy_service import (
+    InvalidTrackedVacancyStatusChangeError,
     create_tracked_vacancy,
     get_existing_tracked_vacancy,
     get_resume_document_for_user,
@@ -142,7 +143,11 @@ async def update_tracked_vacancy_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TrackedVacancyResponse:
-    """Update tracked vacancy for current user."""
+    """Update tracked vacancy for current user.
+
+    Only discarded and closed can be set as status by hand; closing also
+    stamps closed_at. Other statuses are produced by interactions.
+    """
 
     tracked_vacancy = await get_tracked_vacancy_for_user(
         db=db,
@@ -156,11 +161,17 @@ async def update_tracked_vacancy_endpoint(
             detail="Tracked vacancy not found.",
         )
 
-    updated_tracked_vacancy = await update_tracked_vacancy(
-        db=db,
-        tracked_vacancy=tracked_vacancy,
-        data=data,
-    )
+    try:
+        updated_tracked_vacancy = await update_tracked_vacancy(
+            db=db,
+            tracked_vacancy=tracked_vacancy,
+            data=data,
+        )
+    except InvalidTrackedVacancyStatusChangeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
 
     return updated_tracked_vacancy
 

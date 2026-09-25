@@ -12,7 +12,11 @@ from app.schemas.ai_outputs import (
     ParsedVacancyDetails,
 )
 
-from tests.conftest import create_test_user, get_auth_headers
+from tests.conftest import (
+    create_test_user,
+    get_auth_headers,
+    set_tracked_vacancy_fields,
+)
 
 
 VALID_RESUME_TEXT = (
@@ -539,12 +543,10 @@ def test_match_analysis_does_not_change_later_tracked_vacancy_status(
         "closed_at": "2026-08-25T09:00:00+00:00",
         "next_action_at": "2026-08-30T09:00:00+00:00",
     }
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=test_data["auth_headers"],
-        json=tracked_update,
+    set_tracked_vacancy_fields(
+        test_data["tracked_vacancy"]["id"],
+        **tracked_update,
     )
-    assert update_response.status_code == 200
 
     monkeypatch.setattr(
         "app.services.match_analysis_service.parse_match_analysis_chain",

@@ -11,7 +11,11 @@ from app.schemas.ai_outputs import (
     ParsedVacancyDetails,
 )
 
-from tests.conftest import create_test_user, get_auth_headers
+from tests.conftest import (
+    create_test_user,
+    get_auth_headers,
+    set_tracked_vacancy_fields,
+)
 
 
 VALID_RESUME_TEXT = (
@@ -436,12 +440,7 @@ def test_resume_sent_updates_analyzed_tracked_vacancy(client, monkeypatch):
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": "analyzed"},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status="analyzed")
     occurred_at = "2026-08-18T10:30:00+00:00"
 
     response = create_resume_sent_interaction(
@@ -471,12 +470,7 @@ def test_resume_sent_does_not_roll_back_later_status(client, monkeypatch):
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": "screening"},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status="screening")
     occurred_at = "2026-08-18T10:30:00+00:00"
 
     response = create_resume_sent_interaction(
@@ -705,15 +699,11 @@ def test_meaningful_interaction_advances_status_to_recruiter_contact(
         "closed_at": "2026-08-25T09:00:00+00:00",
         "next_action_at": "2026-08-30T09:00:00+00:00",
     }
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={
-            "status": initial_status,
-            **unchanged_fields,
-        },
+    set_tracked_vacancy_fields(
+        tracked_vacancy["id"],
+        status=initial_status,
+        **unchanged_fields,
     )
-    assert update_response.status_code == 200
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",
@@ -777,17 +767,13 @@ def test_incoming_rejection_closes_active_tracked_vacancy(
         "applied_at": "2026-08-10T09:00:00+00:00",
         "next_action_at": "2026-08-30T09:00:00+00:00",
     }
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={
-            "status": initial_status,
-            "priority": "high",
-            "decision": "interested",
-            **unchanged_fields,
-        },
+    set_tracked_vacancy_fields(
+        tracked_vacancy["id"],
+        status=initial_status,
+        priority="high",
+        decision="interested",
+        **unchanged_fields,
     )
-    assert update_response.status_code == 200
     occurred_at = "2026-08-20T10:00:00+00:00"
 
     interaction_response = client.post(
@@ -855,17 +841,13 @@ def test_outgoing_rejection_closes_active_tracked_vacancy(
         "applied_at": "2026-08-10T09:00:00+00:00",
         "next_action_at": "2026-08-30T09:00:00+00:00",
     }
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={
-            "status": initial_status,
-            "priority": "high",
-            "decision": "interested",
-            **unchanged_fields,
-        },
+    set_tracked_vacancy_fields(
+        tracked_vacancy["id"],
+        status=initial_status,
+        priority="high",
+        decision="interested",
+        **unchanged_fields,
     )
-    assert update_response.status_code == 200
     occurred_at = "2026-08-20T10:00:00+00:00"
 
     interaction_response = client.post(
@@ -909,12 +891,7 @@ def test_rejection_requires_direction(client, monkeypatch):
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": "resume_sent"},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status="resume_sent")
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",
@@ -967,15 +944,11 @@ def test_rejection_does_not_overwrite_terminal_tracked_vacancy(
         "closed_at": "2026-08-15T09:00:00+00:00",
         "next_action_at": "2026-08-30T09:00:00+00:00",
     }
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={
-            "status": terminal_status,
-            **terminal_fields,
-        },
+    set_tracked_vacancy_fields(
+        tracked_vacancy["id"],
+        status=terminal_status,
+        **terminal_fields,
     )
-    assert update_response.status_code == 200
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",
@@ -1031,12 +1004,7 @@ def test_failed_rejection_keeps_tracked_vacancy_unchanged(
         "applied_at": "2026-08-10T09:00:00+00:00",
         "next_action_at": "2026-08-30T09:00:00+00:00",
     }
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json=original_fields,
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], **original_fields)
 
     with monkeypatch.context() as commit_patch:
         commit_patch.setattr(
@@ -1137,15 +1105,11 @@ def test_screening_questions_update_only_eligible_statuses(
         "closed_at": "2026-08-25T09:00:00+00:00",
         "next_action_at": "2026-08-30T09:00:00+00:00",
     }
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={
-            "status": initial_status,
-            **unchanged_fields,
-        },
+    set_tracked_vacancy_fields(
+        tracked_vacancy["id"],
+        status=initial_status,
+        **unchanged_fields,
     )
-    assert update_response.status_code == 200
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",
@@ -1227,15 +1191,11 @@ def test_interview_events_advance_eligible_statuses(
         "closed_at": "2026-08-25T09:00:00+00:00",
         "next_action_at": "2026-08-30T09:00:00+00:00",
     }
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={
-            "status": initial_status,
-            **unchanged_fields,
-        },
+    set_tracked_vacancy_fields(
+        tracked_vacancy["id"],
+        status=initial_status,
+        **unchanged_fields,
     )
-    assert update_response.status_code == 200
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",
@@ -1282,12 +1242,7 @@ def test_interview_event_keeps_existing_interview_status(
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": "interview"},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status="interview")
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",
@@ -1331,12 +1286,7 @@ def test_interview_events_do_not_change_ineligible_statuses(
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": initial_status},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status=initial_status)
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",
@@ -1443,15 +1393,11 @@ def test_test_task_interactions_update_only_eligible_statuses(
         "closed_at": "2026-08-25T09:00:00+00:00",
         "next_action_at": "2026-08-30T09:00:00+00:00",
     }
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={
-            "status": initial_status,
-            **unchanged_fields,
-        },
+    set_tracked_vacancy_fields(
+        tracked_vacancy["id"],
+        status=initial_status,
+        **unchanged_fields,
     )
-    assert update_response.status_code == 200
     interaction_data = {
         "interaction_type": "test_task",
         "summary": "Test task event.",
@@ -1523,15 +1469,11 @@ def test_incoming_offer_updates_only_eligible_statuses(
         "closed_at": "2026-08-25T09:00:00+00:00",
         "next_action_at": "2026-08-30T09:00:00+00:00",
     }
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={
-            "status": initial_status,
-            **unchanged_fields,
-        },
+    set_tracked_vacancy_fields(
+        tracked_vacancy["id"],
+        status=initial_status,
+        **unchanged_fields,
     )
-    assert update_response.status_code == 200
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",
@@ -1577,12 +1519,7 @@ def test_offer_rejects_non_incoming_direction(
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": "interview"},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status="interview")
     interaction_data = {
         "interaction_type": "offer",
         "occurred_at": "2026-08-20T10:00:00+00:00",
@@ -1630,12 +1567,7 @@ def test_offer_does_not_overwrite_terminal_status(
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": terminal_status},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status=terminal_status)
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",
@@ -1688,12 +1620,7 @@ def test_progress_interactions_require_first_contact(
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": initial_status},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status=initial_status)
 
     form_data = {
         "interaction_type": interaction_type,
@@ -1745,12 +1672,7 @@ def test_terminal_tracked_vacancy_rejects_progress_interactions(
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": terminal_status},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status=terminal_status)
 
     form_data = {
         "interaction_type": interaction_type,
@@ -1800,12 +1722,7 @@ def test_terminal_tracked_vacancy_accepts_history_only_interactions(
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": terminal_status},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status=terminal_status)
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",
@@ -1874,12 +1791,7 @@ def test_incoming_interview_invitation_is_first_contact(
         monkeypatch,
     )
     tracked_vacancy_path = f"/tracked-vacancies/{tracked_vacancy['id']}"
-    update_response = client.patch(
-        tracked_vacancy_path,
-        headers=auth_headers,
-        json={"status": initial_status},
-    )
-    assert update_response.status_code == 200
+    set_tracked_vacancy_fields(tracked_vacancy["id"], status=initial_status)
 
     interaction_response = client.post(
         f"{tracked_vacancy_path}/interactions",

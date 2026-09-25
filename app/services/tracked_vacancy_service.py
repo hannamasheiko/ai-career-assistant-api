@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -5,6 +7,50 @@ from app.models.resume import ResumeDocument
 from app.models.tracked_vacancy import TrackedVacancy
 from app.models.vacancy import Vacancy
 from app.schemas.tracked_vacancy import TrackedVacancyCreate, TrackedVacancyUpdate
+from app.schemas.tracked_vacancy_enums import TrackedVacancyStatus
+
+
+class InvalidTrackedVacancyStatusChangeError(ValueError):
+    """Status cannot be set manually."""
+
+
+# Statuses the user sets by hand, from any other status.
+MANUAL_CLOSING_STATUSES = frozenset(
+    {TrackedVacancyStatus.DISCARDED, TrackedVacancyStatus.CLOSED}
+)
+
+# Where a manually closed tracked vacancy can be sent back.
+REOPEN_STATUSES = frozenset(
+    {TrackedVacancyStatus.SAVED, TrackedVacancyStatus.ANALYZED}
+)
+
+
+def validate_manual_status_change(
+    current_status: TrackedVacancyStatus,
+    new_status: TrackedVacancyStatus,
+) -> None:
+    """Allow only discarded/closed and the return from them by hand.
+
+    Every other status is produced by interactions, never set directly.
+    """
+
+    if new_status == current_status:
+        return
+
+    if new_status in MANUAL_CLOSING_STATUSES:
+        return
+
+    if (
+        current_status in MANUAL_CLOSING_STATUSES
+        and new_status in REOPEN_STATUSES
+    ):
+        return
+
+    raise InvalidTrackedVacancyStatusChangeError(
+        "Tracked vacancy status cannot be changed manually from "
+        f"{current_status} to {new_status}. Only discarded and closed can "
+        "be set manually; the other statuses come from interactions."
+    )
 
 
 async def get_resume_document_for_user(
@@ -123,6 +169,18 @@ async def update_tracked_vacancy(
     """Update tracked vacancy."""
 
     update_data = data.model_dump(exclude_unset=True)
+    new_status = update_data.get("status")
+
+    if new_status is not None and new_status != tracked_vacancy.status:
+        validate_manual_status_change(
+            current_status=tracked_vacancy.status,
+            new_status=new_status,
+        )
+
+        if new_status in MANUAL_CLOSING_STATUSES:
+            update_data.setdefault("closed_at", datetime.now(timezone.utc))
+        elif tracked_vacancy.status in MANUAL_CLOSING_STATUSES:
+            update_data.setdefault("closed_at", None)
 
     for field_name, field_value in update_data.items():
         setattr(tracked_vacancy, field_name, field_value)

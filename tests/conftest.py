@@ -1,10 +1,11 @@
 import asyncio
 import uuid
+from datetime import datetime
 from collections.abc import AsyncGenerator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import text, update
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -19,6 +20,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app as fastapi_app
 from app import models  # noqa: F401
+from app.models.tracked_vacancy import TrackedVacancy
 
 
 _test_engine: AsyncEngine | None = None
@@ -98,6 +100,36 @@ async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
 
     async with testing_session_local() as session:
         yield session
+
+
+def set_tracked_vacancy_fields(tracked_vacancy_id: int, **fields) -> None:
+    """Write tracked vacancy fields straight to the test database.
+
+    Sets up states the API deliberately does not allow to be set by hand
+    (e.g. status=interview). Fields ending in `_at` accept ISO strings.
+    """
+
+    _, testing_session_local = _get_test_engine()
+
+    values = {
+        name: (
+            datetime.fromisoformat(value)
+            if name.endswith("_at") and isinstance(value, str)
+            else value
+        )
+        for name, value in fields.items()
+    }
+
+    async def write_fields() -> None:
+        async with testing_session_local() as session:
+            await session.execute(
+                update(TrackedVacancy)
+                .where(TrackedVacancy.id == tracked_vacancy_id)
+                .values(**values)
+            )
+            await session.commit()
+
+    asyncio.run(write_fields())
 
 
 @pytest.fixture()
