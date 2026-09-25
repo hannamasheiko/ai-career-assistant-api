@@ -6,14 +6,15 @@ from app.models.interaction import Interaction
 from app.models.resume import ResumeDocument
 from app.models.tracked_vacancy import TrackedVacancy
 from app.schemas.interaction import InteractionCreate, InteractionUpdate
-from app.schemas.interaction_enums import (
-    InteractionDirection,
-    InteractionType,
-)
+from app.schemas.interaction_enums import InteractionType
 from app.schemas.tracked_vacancy_enums import (
     TrackedVacancyDecision,
     TrackedVacancyPriority,
-    TrackedVacancyStatus,
+)
+from app.services.interaction_rules import (
+    find_direction_violation,
+    find_status_violation,
+    next_status,
 )
 
 
@@ -103,60 +104,21 @@ async def create_interaction(
 ) -> Interaction:
     """Create interaction for tracked vacancy."""
 
-    if (
-        data.interaction_type == InteractionType.RESUME_SENT
-        and data.direction != InteractionDirection.OUTGOING
-    ):
-        raise InvalidInteractionError(
-            "A resume_sent interaction must have outgoing direction."
-        )
+    direction_error = find_direction_violation(
+        interaction_type=data.interaction_type,
+        direction=data.direction,
+    )
 
-    if (
-        data.interaction_type == InteractionType.REJECTION
-        and data.direction is None
-    ):
-        raise InvalidInteractionError(
-            "A rejection interaction must have a direction."
-        )
+    if direction_error is not None:
+        raise InvalidInteractionError(direction_error)
 
-    if (
-        data.interaction_type == InteractionType.OFFER
-        and data.direction != InteractionDirection.INCOMING
-    ):
-        raise InvalidInteractionError(
-            "An offer interaction must have incoming direction."
-        )
+    status_error = find_status_violation(
+        interaction_type=data.interaction_type,
+        status=tracked_vacancy.status,
+    )
 
-    if (
-        data.interaction_type == InteractionType.REJECTION
-        and tracked_vacancy.status
-        not in {
-            TrackedVacancyStatus.RESUME_SENT,
-            TrackedVacancyStatus.RECRUITER_CONTACT,
-            TrackedVacancyStatus.SCREENING,
-            TrackedVacancyStatus.INTERVIEW,
-            TrackedVacancyStatus.TEST_TASK,
-            TrackedVacancyStatus.OFFER,
-        }
-    ):
-        raise InvalidInteractionTransitionError(
-            "A rejection interaction cannot be created for a tracked "
-            f"vacancy with status {tracked_vacancy.status}."
-        )
-
-    if (
-        data.interaction_type == InteractionType.OFFER
-        and tracked_vacancy.status
-        in {
-            TrackedVacancyStatus.REJECTED,
-            TrackedVacancyStatus.DISCARDED,
-            TrackedVacancyStatus.CLOSED,
-        }
-    ):
-        raise InvalidInteractionTransitionError(
-            "An offer interaction cannot be created for a tracked "
-            f"vacancy with status {tracked_vacancy.status}."
-        )
+    if status_error is not None:
+        raise InvalidInteractionTransitionError(status_error)
 
     if data.interaction_type == InteractionType.RESUME_SENT:
         existing_result = await db.execute(
@@ -183,87 +145,16 @@ async def create_interaction(
 
     db.add(interaction)
 
-    if data.interaction_type == InteractionType.RESUME_SENT:
-        if tracked_vacancy.status in {
-            TrackedVacancyStatus.SAVED,
-            TrackedVacancyStatus.ANALYZED,
-        }:
-            tracked_vacancy.status = TrackedVacancyStatus.RESUME_SENT
+    tracked_vacancy.status = next_status(
+        status=tracked_vacancy.status,
+        interaction_type=data.interaction_type,
+        direction=data.direction,
+    )
 
+    if data.interaction_type == InteractionType.RESUME_SENT:
         tracked_vacancy.applied_at = data.occurred_at
 
-    if (
-        tracked_vacancy.status
-        in {
-            TrackedVacancyStatus.SAVED,
-            TrackedVacancyStatus.ANALYZED,
-            TrackedVacancyStatus.RESUME_SENT,
-        }
-        and data.direction == InteractionDirection.INCOMING
-        and data.interaction_type in {
-            InteractionType.MESSAGE,
-            InteractionType.CALL,
-        }
-    ):
-        tracked_vacancy.status = TrackedVacancyStatus.RECRUITER_CONTACT
-
-    if (
-        tracked_vacancy.status
-        in {
-            TrackedVacancyStatus.RESUME_SENT,
-            TrackedVacancyStatus.RECRUITER_CONTACT,
-        }
-        and data.interaction_type == InteractionType.SCREENING_QUESTIONS
-        and data.direction == InteractionDirection.INCOMING
-    ):
-        tracked_vacancy.status = TrackedVacancyStatus.SCREENING
-
-    if (
-        tracked_vacancy.status
-        in {
-            TrackedVacancyStatus.RESUME_SENT,
-            TrackedVacancyStatus.RECRUITER_CONTACT,
-            TrackedVacancyStatus.SCREENING,
-            TrackedVacancyStatus.TEST_TASK,
-        }
-        and data.interaction_type
-        in {
-            InteractionType.HR_INTERVIEW,
-            InteractionType.TECHNICAL_INTERVIEW,
-            InteractionType.FINAL_INTERVIEW,
-        }
-    ):
-        tracked_vacancy.status = TrackedVacancyStatus.INTERVIEW
-
-    if (
-        tracked_vacancy.status
-        in {
-            TrackedVacancyStatus.RESUME_SENT,
-            TrackedVacancyStatus.RECRUITER_CONTACT,
-            TrackedVacancyStatus.SCREENING,
-            TrackedVacancyStatus.INTERVIEW,
-        }
-        and data.interaction_type == InteractionType.TEST_TASK
-        and data.direction == InteractionDirection.INCOMING
-    ):
-        tracked_vacancy.status = TrackedVacancyStatus.TEST_TASK
-
-    if (
-        tracked_vacancy.status
-        in {
-            TrackedVacancyStatus.RESUME_SENT,
-            TrackedVacancyStatus.RECRUITER_CONTACT,
-            TrackedVacancyStatus.SCREENING,
-            TrackedVacancyStatus.INTERVIEW,
-            TrackedVacancyStatus.TEST_TASK,
-            TrackedVacancyStatus.OFFER,
-        }
-        and data.interaction_type == InteractionType.OFFER
-    ):
-        tracked_vacancy.status = TrackedVacancyStatus.OFFER
-
     if data.interaction_type == InteractionType.REJECTION:
-        tracked_vacancy.status = TrackedVacancyStatus.REJECTED
         tracked_vacancy.priority = TrackedVacancyPriority.LOW
         tracked_vacancy.decision = TrackedVacancyDecision.NOT_INTERESTED
         tracked_vacancy.closed_at = data.occurred_at
