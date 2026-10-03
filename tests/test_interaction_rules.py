@@ -175,3 +175,13 @@ def test_terminal_status_violation_message_asks_to_reopen():
         "Only message, call and feedback interactions can be added to a "
         "tracked vacancy with status closed. Reopen the tracked vacancy first."
     )
+
+
+def test_rejected_status_violation_message_asks_to_delete_rejection():
+    violation = find_status_violation(Type.TEST_TASK, Status.REJECTED)
+
+    assert violation == (
+        "Only message, call and feedback interactions can be added to a "
+        "tracked vacancy with status rejected. Delete the rejection "
+        "interaction first."
+    )

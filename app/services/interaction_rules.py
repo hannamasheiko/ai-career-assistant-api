@@ -94,8 +94,14 @@ TERMINAL_ALLOWED_TYPES = frozenset(
 
 TERMINAL_STATUS_ERROR_MESSAGE = (
     "Only message, call and feedback interactions can be added to a tracked "
-    "vacancy with status {status}. Reopen the tracked vacancy first."
+    "vacancy with status {status}. {hint}."
 )
+
+TERMINAL_STATUS_HINTS = {
+    Status.REJECTED: "Delete the rejection interaction first",
+    Status.DISCARDED: "Reopen the tracked vacancy first",
+    Status.CLOSED: "Reopen the tracked vacancy first",
+}
 
 
 STATUS_RULES: tuple[StatusRule, ...] = (
@@ -262,7 +268,10 @@ def find_status_violation(
         status in TERMINAL_STATUSES
         and interaction_type not in TERMINAL_ALLOWED_TYPES
     ):
-        return TERMINAL_STATUS_ERROR_MESSAGE.format(status=status)
+        return TERMINAL_STATUS_ERROR_MESSAGE.format(
+            status=status,
+            hint=TERMINAL_STATUS_HINTS[status],
+        )
 
     return None
 
