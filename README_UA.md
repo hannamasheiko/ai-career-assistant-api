@@ -1,0 +1,680 @@
+# AI Career Assistant API
+
+AI Career Assistant API — це backend-застосунок для організації та покращення процесу пошуку роботи за допомогою штучного інтелекту.
+
+Сервіс дозволяє створювати профіль кандидата, завантажувати й структурувати резюме та вакансії, оцінювати відповідність кандидата конкретній позиції, відстежувати відгуки, зберігати історію взаємодії з роботодавцями та генерувати персоналізований контент для подання на вакансію.
+
+Проєкт реалізований як REST API на FastAPI та використовує моделі OpenAI через LangChain для структурованого парсингу, нормалізації, аналізу даних і генерації контенту.
+
+## Мета проєкту
+
+Головна мета проєкту — об’єднати основні етапи пошуку роботи в одній backend-системі:
+
+- зберігання професійних даних і побажань кандидата;
+- перетворення неструктурованого тексту резюме та вакансій у структуровані дані;
+- аналіз вимог вакансії;
+- порівняння кандидата з обраною вакансією;
+- відстеження відгуків і комунікації з роботодавцями;
+- генерація персоналізованого контенту для подання на вакансії — наразі супровідних листів.
+
+## Реалізовано в проєкті
+
+У поточній версії реалізовано:
+
+- реєстрацію та автентифікацію користувачів;
+- контроль доступу на основі JWT;
+- безпечне хешування паролів за допомогою bcrypt;
+- керування профілем кандидата;
+- завантаження резюме як plain text;
+- AI-парсинг і структуризацію резюме;
+- розрахунок комерційного досвіду на backend-рівні;
+- завантаження вакансій як plain text;
+- AI-парсинг та окремий AI-аналіз вакансій;
+- відстеження вакансій для конкретного резюме;
+- AI-аналіз відповідності кандидата вакансії;
+- AI-формування match score та recommendation на основі заданих критеріїв;
+- генерацію персоналізованих cover letter;
+- збереження історії згенерованих варіантів контенту;
+- можливість ручного редагування згенерованого контенту;
+- відстеження взаємодій із роботодавцями;
+- асинхронну інтеграцію з PostgreSQL;
+- міграції бази даних через Alembic;
+- OpenAPI-документацію через Swagger UI та ReDoc;
+- health-check endpoints для застосунку та бази даних;
+- пошук схожих минулих заявок через pgvector для контексту генерації контенту;
+- керування статусами відстежуваної вакансії: автоматичні переходи за подіями, ручне відкидання й закриття, повернення в роботу;
+- автоматичні тести й CI.
+
+## Технології
+
+### Backend
+
+- Python
+- FastAPI
+- Uvicorn
+- Pydantic v2
+- Pydantic Settings
+
+### Database
+
+- PostgreSQL
+- pgvector
+- SQLAlchemy 2.0
+- Async SQLAlchemy
+- asyncpg
+- Alembic
+
+### Testing and CI
+
+- pytest, pytest-cov
+- GitHub Actions — запуск тестів на кожен push
+
+### Authentication and Security
+
+- JWT
+- OAuth2 Password Flow
+- python-jose
+- Passlib
+- bcrypt
+
+### AI Integration
+
+- OpenAI API via `langchain-openai` — використання моделей OpenAI для обробки резюме, вакансій, match analysis і генерації контенту;
+- OpenAI embeddings (`text-embedding-3-small`) — ембеддинги вакансій для пошуку схожих минулих заявок;
+- LangChain — побудова prompt templates та AI chains;
+- LCEL — створення pipeline-послідовностей `prompt → model → structured output`;
+- Pydantic structured outputs — отримання типізованих і валідованих відповідей від LLM;
+- Prompt-based extraction and normalization — витягування та нормалізація даних із резюме й вакансій;
+- Prompt-based analysis — аналіз вакансій і відповідності кандидата;
+- Prompt-based content generation — генерація супровідних листів.
+
+## Архітектура
+
+Застосунок побудований за модульною багатошаровою архітектурою:
+
+```text
+Client
+  ↓
+FastAPI routers
+  ↓
+Service layer
+  ├── AI chains and context builders
+  │     ↓
+  │   OpenAI models
+  │
+  └── SQLAlchemy ORM
+        ↓
+      PostgreSQL
+```
+
+### Основні шари
+
+```text
+app/
+├── ai/
+│   ├── chains/              # OpenAI та LangChain chains
+│   └── context_builders/    # Підготовка структурованого контексту для AI-аналізу
+├── api/                     # FastAPI routers та HTTP endpoints
+├── core/                    # Конфігурація і security utilities
+├── db/                      # Async database engine та session management
+├── models/                  # SQLAlchemy ORM models
+├── schemas/                 # Pydantic request, response та AI-output schemas
+├── services/                # Бізнес-логіка й операції з базою даних
+│   └── interaction_rules.py # Правила переходів статусу TrackedVacancy у вигляді таблиць
+├── dependencies.py          # Спільні FastAPI dependencies
+└── main.py                  # Точка входу застосунку
+
+alembic/
+└── versions/                # Історія міграцій бази даних
+```
+
+API layer обробляє HTTP-запити, автентифікацію, валідацію та HTTP errors. Service layer містить бізнес-логіку й операції з базою даних. AI chains відповідають за структурований парсинг, аналіз і генерацію тексту. Pydantic schemas використовуються для валідації API request/response data, а також для визначення structured outputs, які повинні повертати language models.
+
+
+### Основні сутності
+
+- **User** — обліковий запис і дані для автентифікації.
+- **CandidateProfile** — основні контактні та професійні дані кандидата, а також його побажання щодо ролей, локацій, форматів роботи, типів зайнятості, зарплати та relocation.
+- **ResumeDocument** — оригінальний текст резюме та метадані документа.
+- **ResumeAnalysis** — нормалізована загальна інформація про кандидата, отримана з резюме.
+- **ResumeSection** — структуровані секції резюме: work experience, projects, education, skills, career breaks тощо.
+- **Vacancy** — глобальна сутність спільного каталогу вакансій. Вона не належить конкретному користувачу та навмисно не містить `user_id`. Автентифіковані користувачі можуть використовувати вакансії з каталогу у власному job-search workflow.
+- **VacancyAnalysis** — AI-аналіз вимог, обов’язків, seniority, ризиків і позитивних сигналів вакансії.
+- **VacancyEmbedding** — векторне представлення вакансії для пошуку схожих заявок.
+- **TrackedVacancy** — персональний зв’язок користувача з вакансією через конкретне резюме. Саме ця сутність визначає ownership і зберігає приватний стан: status, priority, decision, notes та історію взаємодій.
+- **MatchAnalysis** — AI-оцінка відповідності кандидата вакансії.
+- **GeneratedContent** — згенерований і вручну відредагований контент для подання.
+- **Interaction** — комунікація або інша активність, пов’язана з відгуком на вакансію.
+
+## Основний функціонал
+
+### Authentication
+
+Модуль автентифікації підтримує:
+
+- реєстрацію нового користувача;
+- перевірку унікальності username та email;
+- хешування паролів через bcrypt;
+- login через OAuth2 Password Flow;
+- генерацію JWT access token;
+- отримання поточного автентифікованого користувача;
+- захист приватних endpoints через Bearer authentication.
+
+Основні endpoints:
+
+```text
+POST /auth/register
+POST /auth/login
+GET  /auth/me
+```
+
+### Candidate Profile
+
+Автентифікований користувач може створити та редагувати власний профіль кандидата.
+
+Профіль зберігає:
+
+- бажані ролі;
+- бажані локації;
+- бажані формати роботи;
+- бажані типи зайнятості;
+- мінімальну очікувану зарплату та валюту;
+- готовність до relocation;
+- інші налаштування пошуку роботи.
+
+Основні endpoints:
+
+```text
+POST  /profile
+GET   /profile/me
+PATCH /profile/me
+```
+
+### Resume Processing
+
+Резюме можна передати у вигляді plain text. AI chain витягує структуровані дані про кандидата та розділяє документ на логічні секції.
+
+Основний flow обробки резюме:
+
+1. отримання оригінального тексту резюме;
+2. витягування нормалізованої інформації про кандидата;
+3. визначення секцій резюме;
+4. витягування періодів комерційної роботи;
+5. розрахунок загальної кількості років комерційного досвіду у backend-коді;
+6. збереження оригінальних і структурованих даних у PostgreSQL.
+
+Language model не розраховує загальний досвід і не визначає seniority кандидата. Ці задачі навмисно відокремлені від етапу витягування даних.
+
+Основний endpoint:
+
+```text
+POST /resumes/from-text
+```
+
+Request body має містити plain text із `text/plain` content type.
+
+Додаткові endpoints:
+
+```text
+GET   /resumes
+GET   /resumes/{resume_document_id}
+PATCH /resumes/{resume_document_id}
+```
+
+### Vacancy Processing
+
+Вакансію можна передати як plain text, скопійований із job board або іншого джерела.
+
+Vacancy parser витягує та нормалізує:
+
+- company name;
+- position title;
+- source та source URL;
+- location;
+- work format;
+- employment type;
+- salary range та currency;
+- cleaned vacancy text.
+
+Основний endpoint:
+
+```text
+POST /vacancies/from-text
+```
+
+При створенні одразу створюється ембеддинг вакансії.
+
+Optional query parameter `analyze=true` дозволяє створити вакансію та одразу запустити її AI-аналіз. Якщо аналіз не вдався, вакансія все одно повертається з `analysis: null`; повторити аналіз можна через `POST /vacancies/{vacancy_id}/analysis`.
+
+### Vacancy ownership model
+
+`Vacancy` є глобальною сутністю спільного каталогу, а не приватним ресурсом користувача. Тому вона не має `user_id`, і доступ до вакансії не фільтрується за користувачем.
+
+Персоналізація та контроль доступу починаються на рівні `TrackedVacancy`. Користувач може бачити й змінювати лише ті tracked vacancies, які пов’язані з його власним resume document.
+
+### Vacancy Analysis
+
+Аналіз вакансії відокремлений від її парсингу та може запускатися незалежно.
+
+AI-аналіз визначає:
+
+- очікуваний experience level;
+- необхідний English level;
+- required skills;
+- optional skills;
+- основні responsibilities;
+- red flags;
+- green flags;
+- summary вакансії;
+- загальну recommendation щодо вакансії.
+
+Основні endpoints:
+
+```text
+POST /vacancies/{vacancy_id}/analysis
+GET  /vacancies/{vacancy_id}/analysis
+```
+
+### Tracked Vacancies
+
+Вакансію можна пов’язати з конкретним резюме та додати до процесу відстеження відгуків.
+
+TrackedVacancy зберігає:
+
+- поточний `status`;
+- `priority` і `decision`;
+- `notes`;
+- `applied_at` — дата відправлення резюме;
+- `closed_at` — дата завершення роботи з вакансією;
+- `next_action_at` — нагадування.
+
+Одна й та сама вакансія не може бути повторно пов’язана з тим самим резюме.
+
+Основні endpoints:
+
+```text
+POST  /tracked-vacancies
+GET   /tracked-vacancies
+GET   /tracked-vacancies/{tracked_vacancy_id}
+PATCH /tracked-vacancies/{tracked_vacancy_id}
+POST  /tracked-vacancies/{tracked_vacancy_id}/reopen
+```
+
+### Статуси TrackedVacancy
+
+Статус рухається переважно подіями (interactions): вхідне повідомлення від рекрутера, співбесіда, тестове завдання, оффер або відмова. Вручну можна лише відкинути (`discarded`) або закрити (`closed`) вакансію, а повернути її в роботу — endpoint `reopen`. Статус після повернення перераховується з історії interactions.
+
+Повний опис переходів, заборон і правил для дат: [docs/tracked-vacancy-status-flow.uk.md](docs/tracked-vacancy-status-flow.uk.md).
+
+### Candidate-to-Vacancy Match Analysis
+
+Модуль match analysis порівнює кандидата з обраною вакансією, використовуючи:
+
+- налаштування CandidateProfile;
+- нормалізований ResumeAnalysis;
+- деталізовані ResumeSection;
+- оригінальний текст резюме;
+- нормалізовані дані Vacancy;
+- VacancyAnalysis;
+- cleaned vacancy text.
+
+Аналіз виконується з поєднаної позиції IT recruiter та technical hiring manager.
+
+Результат містить:
+
+- match score від 0 до 100;
+- recommendation category;
+- strong matches;
+- partial matches;
+- missing skills;
+- risk points;
+- reasoning summary.
+
+Prompt визначає такі правила відповідності між match score і recommendation:
+
+```text
+85–100  strong_match
+70–84   good_match
+55–69   partial_match
+40–54   weak_match
+0–39    not_recommended
+```
+
+Для кожної TrackedVacancy зберігається лише один актуальний MatchAnalysis. Повторний запуск оновлює наявний результат.
+
+Основні endpoints:
+
+```text
+POST /tracked-vacancies/{tracked_vacancy_id}/match-analysis
+GET  /tracked-vacancies/{tracked_vacancy_id}/match-analysis
+```
+
+### Generated Content
+
+Застосунок може генерувати персоналізований контент для подання на вакансію на основі резюме, вакансії та доступного MatchAnalysis.
+
+Наразі реалізований тип контенту:
+
+- cover letter.
+
+Генерація підтримує:
+
+- вибір мови;
+- вибір tone;
+- додаткові інструкції користувача;
+- збереження окремого запису для кожної нової генерації;
+- ручне редагування збереженого контенту.
+
+Резюме залишається основним джерелом фактів про кандидата. AI не повинен вигадувати комерційний досвід, skills, achievements, motivation або дані про компанію.
+
+Основні endpoints:
+
+```text
+POST  /tracked-vacancies/{tracked_vacancy_id}/generated-content/generate
+GET   /tracked-vacancies/{tracked_vacancy_id}/generated-content
+GET   /tracked-vacancies/generated-content/{generated_content_id}
+PATCH /tracked-vacancies/generated-content/{generated_content_id}
+```
+
+Для контексту генерації застосунок шукає схожі минулі заявки через pgvector: вакансії з близьким ембеддингом і їхній результат (статус і дати) передаються моделі як історичний контекст.
+
+### Interaction Tracking
+
+Застосунок зберігає активності та комунікацію, пов’язані з TrackedVacancy. Типи interaction:
+
+- `resume_sent` — подання резюме;
+- `message`, `call` — повідомлення або дзвінок;
+- `screening_questions` — скринінг-питання;
+- `interview_invitation` — запрошення на співбесіду;
+- `hr_interview`, `technical_interview`, `final_interview` — співбесіди;
+- `test_task` — тестове завдання;
+- `feedback` — фідбек;
+- `offer_discussion`, `offer` — обговорення оферу та оффер;
+- `rejection` — відмова.
+
+Напрямок (`incoming` / `outgoing`) задається для кожного типу окремо: для `resume_sent` лише `outgoing`, для `offer` лише `incoming`, для `rejection` обов’язковий.
+
+Основні endpoints:
+
+```text
+POST   /tracked-vacancies/{tracked_vacancy_id}/interactions
+GET    /tracked-vacancies/{tracked_vacancy_id}/interactions
+GET    /tracked-vacancies/interactions/{interaction_id}
+PATCH  /tracked-vacancies/interactions/{interaction_id}
+DELETE /tracked-vacancies/interactions/{interaction_id}
+```
+
+Тип і напрямок interaction після створення не редагуються: помилку виправляють видаленням і повторним внесенням.
+
+## Основний flow застосунку
+
+```text
+1. Реєстрація користувача
+   ↓
+2. Login та отримання JWT access token
+   ↓
+3. Створення CandidateProfile
+   ↓
+4. Передавання тексту резюме
+   ↓
+5. Парсинг і збереження резюме
+   ↓
+6. Передавання тексту вакансії
+   ↓
+7. Парсинг та аналіз вакансії
+   ↓
+8. Прив’язка вакансії до обраного резюме
+   ↓
+9. Генерація Candidate-to-Vacancy MatchAnalysis
+   ↓
+10. Генерація персоналізованого cover letter
+   ↓
+11. Відстеження application status і взаємодій із роботодавцем
+```
+
+## Запуск застосунку
+
+### Передумови
+
+Перед запуском застосунку необхідно встановити:
+
+- Python 3.11 або новіший
+- PostgreSQL;
+- Git.
+
+Для resume parsing, vacancy parsing, vacancy analysis, match analysis і content generation потрібен OpenAI API key.
+
+### 1. Клонування репозиторію
+
+```bash
+git clone https://github.com/hannamasheiko/ai-career-assistant-api.git
+cd ai-career-assistant-api
+```
+
+### 2. Створення virtual environment
+
+```bash
+python -m venv .venv
+```
+
+Активація на macOS або Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+Активація на Windows:
+
+```bash
+.venv\Scripts\activate
+```
+
+### 3. Встановлення залежностей
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Створення PostgreSQL database
+
+Створіть локальну PostgreSQL database та користувача. Значення, які використовуються в прикладі конфігурації:
+
+```text
+Database: ai_career_assistant_db
+User:     ai_career_user
+Password: ai_career_password
+Port:     5435
+```
+
+Окрема база `ai_career_test_db` потрібна для тестів (`TEST_DATABASE_URL`). Створіть її з тими самими користувачем і портом.
+
+Port та credentials можна змінити через environment variables.
+
+### 5. Налаштування environment variables
+
+Скопіюйте приклад environment file:
+
+```bash
+cp .env.example .env
+```
+
+Налаштуйте `.env`:
+
+```env
+PROJECT_NAME=AI Career Assistant API
+API_VERSION=0.1.0
+ENVIRONMENT=development
+
+DATABASE_URL=postgresql+asyncpg://ai_career_user:ai_career_password@localhost:5435/ai_career_assistant_db
+
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_TIMEOUT=90
+OPENAI_MAX_RETRIES=2
+
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_EMBEDDING_DIMENSIONS=1536
+
+SECRET_KEY=replace_with_a_long_random_secret_key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+```
+
+Повний список змінних із коментарями — у `.env.example`. Токен доступу за замовчуванням живе 8 годин.
+
+Не додавайте `.env` або реальні secrets до version control.
+
+Безпечний development secret можна згенерувати командою:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+
+### 6. Застосування database migrations
+
+```bash
+alembic upgrade head
+```
+
+Створення нової migration після зміни SQLAlchemy models:
+
+```bash
+alembic revision --autogenerate -m "describe migration"
+```
+
+Відкат останньої migration:
+
+```bash
+alembic downgrade -1
+```
+
+### 7. Запуск застосунку
+
+#### Через Docker
+
+Для запуску AI Career Assistant API та PostgreSQL виконайте:
+
+```bash
+docker compose up --build
+```
+
+Після запуску API буде доступний за адресою:
+
+```text
+http://localhost:8004
+```
+
+#### Локально
+
+```bash
+uvicorn app.main:app --reload
+```
+
+API буде доступний за адресою:
+
+```text
+http://127.0.0.1:8000
+```
+
+## API-документація
+
+FastAPI автоматично генерує інтерактивну OpenAPI-документацію.
+
+При запуску через Docker Compose:
+
+```text
+Swagger UI:    http://localhost:8004/docs
+ReDoc:         http://localhost:8004/redoc
+OpenAPI schema: http://localhost:8004/openapi.json
+```
+
+При локальному запуску:
+
+```text
+Swagger UI:    http://127.0.0.1:8000/docs
+ReDoc:         http://127.0.0.1:8000/redoc
+OpenAPI schema: http://127.0.0.1:8000/openapi.json
+```
+
+Protected endpoints можна тестувати у Swagger UI: виконайте login, скопіюйте отриманий access token і скористайтеся кнопкою **Authorize**.
+
+Повний перелік кодів відповідей — у Swagger. Найважливіші для відстеження вакансій:
+
+- `400` — порушено правило напрямку interaction;
+- `409` — статус треку не дозволяє дію;
+- `422` — некоректні дані або заборонене поле в запиті;
+- `503` — AI-сервіс не налаштований (наприклад, немає `OPENAI_API_KEY`).
+
+## Health Checks
+
+Перевірка стану застосунку:
+
+```text
+GET /health
+```
+
+Перевірка підключення до бази даних (повертає `503`, якщо база недоступна):
+
+```text
+GET /db-health
+```
+
+Root endpoint:
+
+```text
+GET /
+```
+
+## Тести
+
+Запуск усіх тестів:
+
+```bash
+pytest
+```
+
+Тести використовують окрему базу даних, яка задається через `TEST_DATABASE_URL` (вона є в `.env.example`). Назва цієї бази має містити слово `test` як окреме слово (наприклад, `ai_career_test_db`), і вона має відрізнятися від `DATABASE_URL`. Інакше тести не запускаються, щоб не стерти основну базу. Тести з базою створюють і видаляють таблиці в цій базі, тому основну базу вони не чіпають.
+
+Тести не викликають реальну модель: AI-виклики замінені мокапами. Окремі AI-eval тести (`ai_eval`) викликають OpenAI, вимкнені за замовчуванням і запускаються так:
+
+```bash
+pytest -m ai_eval
+```
+
+GitHub Actions запускає `pytest` на кожен push.
+
+## Принципи роботи AI-шару
+
+AI layer дотримується таких правил:
+
+- structured outputs проходять валідацію через Pydantic schemas;
+- extraction відокремлений від evaluation;
+- resume parsing не визначає seniority кандидата;
+- commercial experience відокремлюється від pet projects і career breaks;
+- загальний commercial experience розраховується backend-кодом;
+- vacancy parsing відокремлений від vacancy evaluation;
+- match analysis використовує structured data як основне джерело;
+- generated content не повинен містити непідтверджені факти про кандидата;
+- prompts містять захист від інструкцій, вбудованих у текст резюме або вакансії;
+- model name і prompt version зберігаються разом з AI-generated records там, де це передбачено моделями.
+
+## Міграції бази даних
+
+Alembic використовується для версіонування й оновлення PostgreSQL schema.
+
+Поточна історія migrations включає:
+
+- створення основних таблиць застосунку;
+- таблицю користувачів і зв’язок користувача з CandidateProfile;
+- unique constraints для зв’язку resume-to-vacancy;
+- обмеження одного актуального MatchAnalysis для кожної TrackedVacancy;
+- поля професійних побажань CandidateProfile;
+- check constraints для полів TrackedVacancy і Interaction;
+- перейменування `last_contact_at` у `closed_at`;
+- таблицю ембеддингів вакансій (`vacancy_embeddings`) і розширення `vector` для pgvector.
+
+Після отримання змін у models або database schema застосуйте останні migrations:
+
+```bash
+alembic upgrade head
+```
