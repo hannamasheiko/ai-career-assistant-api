@@ -613,3 +613,35 @@ def test_patch_with_unchanged_status_still_updates_other_fields(
     assert response.json()["status"] == "interview"
     assert response.json()["priority"] == "high"
     assert response.json()["closed_at"] is None
+
+
+@pytest.mark.parametrize(
+    "status",
+    ["analyzed", "resume_sent", "recruiter_contact", "offer", "rejected", "closed"],
+)
+def test_create_tracked_vacancy_accepts_only_saved_status(
+    client,
+    monkeypatch,
+    status,
+):
+    auth_headers, resume, vacancy = prepare_tracked_vacancy_data(
+        client,
+        monkeypatch,
+    )
+
+    response = client.post(
+        "/tracked-vacancies",
+        headers=auth_headers,
+        json={
+            "resume_document_id": resume["id"],
+            "vacancy_id": vacancy["id"],
+            "status": status,
+        },
+    )
+
+    assert response.status_code == 422
+
+    list_response = client.get("/tracked-vacancies", headers=auth_headers)
+
+    assert list_response.json() == []
+

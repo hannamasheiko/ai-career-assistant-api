@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,7 +16,7 @@ class TrackedVacancyCreate(BaseModel):
     resume_document_id: int
     vacancy_id: int
 
-    status: TrackedVacancyStatus = TrackedVacancyStatus.SAVED
+    status: Literal[TrackedVacancyStatus.SAVED] = TrackedVacancyStatus.SAVED
     priority: TrackedVacancyPriority = TrackedVacancyPriority.LOW
     decision: TrackedVacancyDecision = TrackedVacancyDecision.INTERESTED
 
