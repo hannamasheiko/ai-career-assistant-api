@@ -276,7 +276,14 @@ POST  /tracked-vacancies
 GET   /tracked-vacancies
 GET   /tracked-vacancies/{tracked_vacancy_id}
 PATCH /tracked-vacancies/{tracked_vacancy_id}
+POST  /tracked-vacancies/{tracked_vacancy_id}/reopen
 ```
+
+### Статуси TrackedVacancy
+
+Статус рухається переважно подіями (interactions): вхідне повідомлення від рекрутера, співбесіда, тестове завдання, оффер або відмова. Вручну можна лише відкинути (`discarded`) або закрити (`closed`) вакансію, а повернути її в роботу — endpoint `reopen`. Статус після повернення перераховується з історії interactions.
+
+Повний опис переходів, заборон і правил для дат: [docs/tracked-vacancy-status-flow.uk.md](docs/tracked-vacancy-status-flow.uk.md).
 
 ### Candidate-to-Vacancy Match Analysis
 
@@ -363,11 +370,14 @@ PATCH /generated-content/{generated_content_id}
 Основні endpoints:
 
 ```text
-POST  /tracked-vacancies/{tracked_vacancy_id}/interactions
-GET   /tracked-vacancies/{tracked_vacancy_id}/interactions
-GET   /tracked-vacancies/interactions/{interaction_id}
-PATCH /tracked-vacancies/interactions/{interaction_id}
+POST   /tracked-vacancies/{tracked_vacancy_id}/interactions
+GET    /tracked-vacancies/{tracked_vacancy_id}/interactions
+GET    /tracked-vacancies/interactions/{interaction_id}
+PATCH  /tracked-vacancies/interactions/{interaction_id}
+DELETE /tracked-vacancies/interactions/{interaction_id}
 ```
+
+Тип і напрямок interaction після створення не редагуються: помилку виправляють видаленням і повторним внесенням.
 
 ## Основний flow застосунку
 
