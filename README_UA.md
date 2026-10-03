@@ -1,3 +1,5 @@
+[English](README.md) | Українська
+
 # AI Career Assistant API
 
 AI Career Assistant API — це backend-застосунок для організації та покращення процесу пошуку роботи за допомогою штучного інтелекту.
