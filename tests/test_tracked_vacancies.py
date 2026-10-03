@@ -466,12 +466,35 @@ def test_interaction_driven_statuses_cannot_be_set_manually(
 
 
 @pytest.mark.parametrize("closed_status", ["discarded", "closed"])
-@pytest.mark.parametrize("reopen_status", ["saved", "analyzed"])
-def test_closed_tracked_vacancy_can_be_reopened_and_clears_closed_at(
+@pytest.mark.parametrize("patch_status", ["saved", "analyzed"])
+def test_closed_tracked_vacancy_cannot_be_reopened_by_patch(
     client,
     monkeypatch,
     closed_status,
-    reopen_status,
+    patch_status,
+):
+    auth_headers, path = prepare_tracked_vacancy_for_status_change(
+        client,
+        monkeypatch,
+        closed_status,
+    )
+
+    response = client.patch(
+        path,
+        headers=auth_headers,
+        json={"status": patch_status},
+    )
+
+    assert response.status_code == 409
+    assert "/reopen" in response.json()["detail"]
+    assert client.get(path, headers=auth_headers).json()["status"] == closed_status
+
+
+@pytest.mark.parametrize("closed_status", ["discarded", "closed"])
+def test_reopen_endpoint_returns_closed_tracked_vacancy_to_work(
+    client,
+    monkeypatch,
+    closed_status,
 ):
     auth_headers, path = prepare_tracked_vacancy_for_status_change(
         client,
@@ -485,15 +508,47 @@ def test_closed_tracked_vacancy_can_be_reopened_and_clears_closed_at(
     )
     assert close_response.status_code == 200
 
-    response = client.patch(
-        path,
-        headers=auth_headers,
-        json={"status": reopen_status},
-    )
+    response = client.post(f"{path}/reopen", headers=auth_headers)
 
     assert response.status_code == 200
-    assert response.json()["status"] == reopen_status
+    # No interactions and no match analysis: the history gives "saved".
+    assert response.json()["status"] == "saved"
     assert response.json()["closed_at"] is None
+
+
+@pytest.mark.parametrize("status", ["saved", "interview", "offer", "rejected"])
+def test_reopen_endpoint_rejects_tracked_vacancies_that_are_not_closed(
+    client,
+    monkeypatch,
+    status,
+):
+    auth_headers, path = prepare_tracked_vacancy_for_status_change(
+        client,
+        monkeypatch,
+        status,
+    )
+
+    response = client.post(f"{path}/reopen", headers=auth_headers)
+
+    assert response.status_code == 409
+    assert client.get(path, headers=auth_headers).json()["status"] == status
+
+
+def test_reopen_endpoint_does_not_expose_other_users_tracked_vacancy(
+    client,
+    monkeypatch,
+):
+    owner_headers, path = prepare_tracked_vacancy_for_status_change(
+        client,
+        monkeypatch,
+        "discarded",
+    )
+    intruder = create_test_user(client, prefix="intruder")
+    intruder_headers = get_auth_headers(client, intruder)
+
+    response = client.post(f"{path}/reopen", headers=intruder_headers)
+
+    assert response.status_code == 404
 
 
 def test_closed_tracked_vacancy_cannot_jump_to_interaction_status(

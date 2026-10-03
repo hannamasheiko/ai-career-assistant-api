@@ -67,6 +67,10 @@ DIRECTION_RULES: tuple[DirectionRule, ...] = (
 )
 
 
+# Set by hand only; interactions never produce these, and replaying history
+# does not override them.
+MANUAL_CLOSING_STATUSES = frozenset({Status.DISCARDED, Status.CLOSED})
+
 # Statuses reached only after the first real contact with the company.
 ACTIVE_STATUSES = frozenset(
     {
@@ -277,5 +281,22 @@ def next_status(
             and status in rule.from_statuses
         ):
             return rule.to_status
+
+    return status
+
+
+def recalculate_status(
+    history: list[tuple[InteractionType, InteractionDirection | None]],
+    has_match_analysis: bool,
+) -> TrackedVacancyStatus:
+    """Replay interactions in order and return the resulting status.
+
+    history must already be sorted by occurred_at.
+    """
+
+    status = Status.ANALYZED if has_match_analysis else Status.SAVED
+
+    for interaction_type, direction in history:
+        status = next_status(status, interaction_type, direction)
 
     return status

@@ -1852,3 +1852,227 @@ def test_incoming_interview_invitation_is_first_contact(
     )
 
     assert tracked_response.json()["status"] == expected_status
+
+
+def post_interaction(
+    client,
+    auth_headers,
+    tracked_vacancy_id,
+    interaction_type,
+    direction,
+    occurred_at,
+):
+    """Create an interaction and return its JSON, asserting success."""
+
+    data = {
+        "interaction_type": interaction_type,
+        "occurred_at": occurred_at,
+    }
+    if direction is not None:
+        data["direction"] = direction
+
+    response = client.post(
+        f"/tracked-vacancies/{tracked_vacancy_id}/interactions",
+        headers=auth_headers,
+        data=data,
+    )
+    assert response.status_code == 201, response.text
+
+    return response.json()
+
+
+def get_tracked(client, auth_headers, tracked_vacancy_id):
+    response = client.get(
+        f"/tracked-vacancies/{tracked_vacancy_id}",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    return response.json()
+
+
+def test_delete_resume_sent_returns_status_and_clears_applied_at(
+    client,
+    monkeypatch,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(client, monkeypatch)
+    tv_id = tracked_vacancy["id"]
+    resume_sent = post_interaction(
+        client, auth_headers, tv_id, "resume_sent", "outgoing",
+        "2026-08-01T10:00:00+00:00",
+    )
+    assert get_tracked(client, auth_headers, tv_id)["status"] == "resume_sent"
+
+    response = client.delete(
+        f"/tracked-vacancies/interactions/{resume_sent['id']}",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 204
+    tracked = get_tracked(client, auth_headers, tv_id)
+    assert tracked["status"] == "saved"
+    assert tracked["applied_at"] is None
+
+
+def test_delete_last_event_recalculates_from_remaining_history(
+    client,
+    monkeypatch,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(client, monkeypatch)
+    tv_id = tracked_vacancy["id"]
+    post_interaction(client, auth_headers, tv_id, "resume_sent", "outgoing",
+                     "2026-08-01T10:00:00+00:00")
+    post_interaction(client, auth_headers, tv_id, "message", "incoming",
+                     "2026-08-05T10:00:00+00:00")
+    interview = post_interaction(client, auth_headers, tv_id, "hr_interview", None,
+                                 "2026-08-10T10:00:00+00:00")
+    assert get_tracked(client, auth_headers, tv_id)["status"] == "interview"
+
+    client.delete(
+        f"/tracked-vacancies/interactions/{interview['id']}",
+        headers=auth_headers,
+    )
+
+    assert get_tracked(client, auth_headers, tv_id)["status"] == "recruiter_contact"
+
+
+def test_deleting_rejection_restores_status_and_clears_closed_at(
+    client,
+    monkeypatch,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(client, monkeypatch)
+    tv_id = tracked_vacancy["id"]
+    post_interaction(client, auth_headers, tv_id, "resume_sent", "outgoing",
+                     "2026-08-01T10:00:00+00:00")
+    post_interaction(client, auth_headers, tv_id, "message", "incoming",
+                     "2026-08-05T10:00:00+00:00")
+    rejection = post_interaction(client, auth_headers, tv_id, "rejection", "incoming",
+                                 "2026-08-10T10:00:00+00:00")
+    rejected = get_tracked(client, auth_headers, tv_id)
+    assert rejected["status"] == "rejected"
+    assert rejected["closed_at"] is not None
+
+    client.delete(
+        f"/tracked-vacancies/interactions/{rejection['id']}",
+        headers=auth_headers,
+    )
+
+    tracked = get_tracked(client, auth_headers, tv_id)
+    assert tracked["status"] == "recruiter_contact"
+    assert tracked["closed_at"] is None
+    # Old priority and decision are not restored; the user fixes them by hand.
+    assert tracked["priority"] == "low"
+    assert tracked["decision"] == "not_interested"
+
+
+def test_deleting_interaction_keeps_manually_discarded_status(
+    client,
+    monkeypatch,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(client, monkeypatch)
+    tv_id = tracked_vacancy["id"]
+    resume_sent = post_interaction(client, auth_headers, tv_id, "resume_sent", "outgoing",
+                                   "2026-08-01T10:00:00+00:00")
+    client.patch(
+        f"/tracked-vacancies/{tv_id}",
+        headers=auth_headers,
+        json={"status": "discarded"},
+    )
+
+    response = client.delete(
+        f"/tracked-vacancies/interactions/{resume_sent['id']}",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 204
+    tracked = get_tracked(client, auth_headers, tv_id)
+    assert tracked["status"] == "discarded"
+    assert tracked["applied_at"] is None
+
+
+def test_changing_occurred_at_resyncs_applied_at_and_closed_at(
+    client,
+    monkeypatch,
+):
+    auth_headers, tracked_vacancy = prepare_interaction_data(client, monkeypatch)
+    tv_id = tracked_vacancy["id"]
+    resume_sent = post_interaction(client, auth_headers, tv_id, "resume_sent", "outgoing",
+                                   "2026-08-01T10:00:00+00:00")
+    rejection = post_interaction(client, auth_headers, tv_id, "rejection", "incoming",
+                                 "2026-08-10T10:00:00+00:00")
+
+    client.patch(
+        f"/tracked-vacancies/interactions/{resume_sent['id']}",
+        headers=auth_headers,
+        json={"occurred_at": "2026-07-28T09:00:00+00:00"},
+    )
+    client.patch(
+        f"/tracked-vacancies/interactions/{rejection['id']}",
+        headers=auth_headers,
+        json={"occurred_at": "2026-08-12T09:00:00+00:00"},
+    )
+
+    tracked = get_tracked(client, auth_headers, tv_id)
+    assert datetime.fromisoformat(tracked["applied_at"]) == (
+        datetime.fromisoformat("2026-07-28T09:00:00+00:00")
+    )
+    assert datetime.fromisoformat(tracked["closed_at"]) == (
+        datetime.fromisoformat("2026-08-12T09:00:00+00:00")
+    )
+
+
+def test_reopen_recalculates_status_from_history(client, monkeypatch):
+    auth_headers, tracked_vacancy = prepare_interaction_data(client, monkeypatch)
+    tv_id = tracked_vacancy["id"]
+    post_interaction(client, auth_headers, tv_id, "resume_sent", "outgoing",
+                     "2026-08-01T10:00:00+00:00")
+    post_interaction(client, auth_headers, tv_id, "message", "incoming",
+                     "2026-08-05T10:00:00+00:00")
+    client.patch(
+        f"/tracked-vacancies/{tv_id}",
+        headers=auth_headers,
+        json={"status": "discarded"},
+    )
+    assert get_tracked(client, auth_headers, tv_id)["closed_at"] is not None
+
+    response = client.post(
+        f"/tracked-vacancies/{tv_id}/reopen",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "recruiter_contact"
+    assert response.json()["closed_at"] is None
+
+
+def test_delete_interaction_rejects_other_user_and_missing_id(
+    client,
+    monkeypatch,
+):
+    owner_headers, tracked_vacancy = prepare_interaction_data(client, monkeypatch)
+    interaction = create_test_interaction(
+        client,
+        owner_headers,
+        tracked_vacancy["id"],
+    )
+    other_user = create_test_user(client, prefix="intruder")
+    other_headers = get_auth_headers(client, other_user)
+
+    other_response = client.delete(
+        f"/tracked-vacancies/interactions/{interaction['id']}",
+        headers=other_headers,
+    )
+    missing_response = client.delete(
+        "/tracked-vacancies/interactions/999999",
+        headers=owner_headers,
+    )
+
+    assert other_response.status_code == 404
+    assert missing_response.status_code == 404
+    assert missing_response.json()["detail"] == "Interaction not found."
+    interactions_response = client.get(
+        f"/tracked-vacancies/{tracked_vacancy['id']}/interactions",
+        headers=owner_headers,
+    )
+    assert len(interactions_response.json()) == 1
+

@@ -17,6 +17,7 @@ from app.services.tracked_vacancy_service import (
     get_tracked_vacancies_for_user,
     get_tracked_vacancy_for_user,
     get_vacancy_by_id,
+    reopen_tracked_vacancy,
     update_tracked_vacancy,
 )
 
@@ -146,7 +147,8 @@ async def update_tracked_vacancy_endpoint(
     """Update tracked vacancy for current user.
 
     Only discarded and closed can be set as status by hand; closing also
-    stamps closed_at. Other statuses are produced by interactions.
+    stamps closed_at. Other statuses are produced by interactions; to return
+    a discarded or closed tracked vacancy to work use the reopen endpoint.
     """
 
     tracked_vacancy = await get_tracked_vacancy_for_user(
@@ -174,6 +176,47 @@ async def update_tracked_vacancy_endpoint(
         ) from error
 
     return updated_tracked_vacancy
+
+@router.post(
+    "/{tracked_vacancy_id}/reopen",
+    response_model=TrackedVacancyResponse,
+)
+async def reopen_tracked_vacancy_endpoint(
+    tracked_vacancy_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TrackedVacancyResponse:
+    """Return a discarded or closed tracked vacancy to work.
+
+    The status and dates are recalculated from the interaction history, so
+    the result depends on what was recorded before the tracked vacancy was
+    closed. Rejected tracked vacancies are not reopened here: delete the
+    rejection interaction instead.
+    """
+
+    tracked_vacancy = await get_tracked_vacancy_for_user(
+        db=db,
+        tracked_vacancy_id=tracked_vacancy_id,
+        user_id=current_user.id,
+    )
+
+    if tracked_vacancy is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tracked vacancy not found.",
+        )
+
+    try:
+        return await reopen_tracked_vacancy(
+            db=db,
+            tracked_vacancy=tracked_vacancy,
+        )
+    except InvalidTrackedVacancyStatusChangeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+
 
 @router.post(
     "/{tracked_vacancy_id}/match-analysis",

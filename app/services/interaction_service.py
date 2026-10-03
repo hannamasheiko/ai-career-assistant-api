@@ -2,7 +2,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from datetime import datetime, timezone
+
 from app.models.interaction import Interaction
+from app.models.match_analysis import MatchAnalysis
 from app.models.resume import ResumeDocument
 from app.models.tracked_vacancy import TrackedVacancy
 from app.schemas.interaction import InteractionCreate, InteractionUpdate
@@ -12,9 +15,11 @@ from app.schemas.tracked_vacancy_enums import (
     TrackedVacancyPriority,
 )
 from app.services.interaction_rules import (
+    MANUAL_CLOSING_STATUSES,
     find_direction_violation,
     find_status_violation,
     next_status,
+    recalculate_status,
 )
 
 
@@ -170,6 +175,76 @@ async def create_interaction(
     return interaction
 
 
+_UNDATED = datetime.max.replace(tzinfo=timezone.utc)
+
+
+async def sync_tracked_vacancy_with_history(
+    db: AsyncSession,
+    tracked_vacancy: TrackedVacancy,
+    *,
+    keep_manual_status: bool,
+) -> None:
+    """Recompute status and dates from the interactions that remain.
+
+    Does not commit. With keep_manual_status=True a manually discarded or
+    closed tracked vacancy keeps its status, but its dates still follow the
+    history.
+    """
+
+    result = await db.execute(
+        select(Interaction).where(
+            Interaction.tracked_vacancy_id == tracked_vacancy.id
+        )
+    )
+    interactions = sorted(
+        result.scalars().all(),
+        key=lambda item: (item.occurred_at or _UNDATED, item.id),
+    )
+
+    match_result = await db.execute(
+        select(MatchAnalysis.id)
+        .where(MatchAnalysis.tracked_vacancy_id == tracked_vacancy.id)
+        .limit(1)
+    )
+    has_match_analysis = match_result.scalar_one_or_none() is not None
+
+    keeps_status = (
+        keep_manual_status
+        and tracked_vacancy.status in MANUAL_CLOSING_STATUSES
+    )
+
+    if not keeps_status:
+        tracked_vacancy.status = recalculate_status(
+            history=[
+                (item.interaction_type, item.direction)
+                for item in interactions
+            ],
+            has_match_analysis=has_match_analysis,
+        )
+
+    resume_sent = next(
+        (
+            item
+            for item in interactions
+            if item.interaction_type == InteractionType.RESUME_SENT
+        ),
+        None,
+    )
+    tracked_vacancy.applied_at = (
+        resume_sent.occurred_at if resume_sent is not None else None
+    )
+
+    if tracked_vacancy.status not in MANUAL_CLOSING_STATUSES:
+        rejections = [
+            item
+            for item in interactions
+            if item.interaction_type == InteractionType.REJECTION
+        ]
+        tracked_vacancy.closed_at = (
+            rejections[-1].occurred_at if rejections else None
+        )
+
+
 async def update_interaction(
     db: AsyncSession,
     interaction: Interaction,
@@ -182,7 +257,46 @@ async def update_interaction(
     for field_name, field_value in update_data.items():
         setattr(interaction, field_name, field_value)
 
+    if "occurred_at" in update_data:
+        await db.flush()
+        tracked_vacancy = await db.get(
+            TrackedVacancy,
+            interaction.tracked_vacancy_id,
+        )
+        await sync_tracked_vacancy_with_history(
+            db,
+            tracked_vacancy,
+            keep_manual_status=True,
+        )
+
     await db.commit()
     await db.refresh(interaction)
 
     return interaction
+
+
+async def delete_interaction(
+    db: AsyncSession,
+    interaction: Interaction,
+) -> None:
+    """Delete interaction and recalculate the tracked vacancy from history."""
+
+    tracked_vacancy = await db.get(
+        TrackedVacancy,
+        interaction.tracked_vacancy_id,
+    )
+
+    await db.delete(interaction)
+    await db.flush()
+
+    await sync_tracked_vacancy_with_history(
+        db,
+        tracked_vacancy,
+        keep_manual_status=True,
+    )
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise

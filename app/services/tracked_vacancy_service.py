@@ -8,30 +8,21 @@ from app.models.tracked_vacancy import TrackedVacancy
 from app.models.vacancy import Vacancy
 from app.schemas.tracked_vacancy import TrackedVacancyCreate, TrackedVacancyUpdate
 from app.schemas.tracked_vacancy_enums import TrackedVacancyStatus
+from app.services.interaction_rules import MANUAL_CLOSING_STATUSES
+from app.services.interaction_service import sync_tracked_vacancy_with_history
 
 
 class InvalidTrackedVacancyStatusChangeError(ValueError):
     """Status cannot be set manually."""
 
 
-# Statuses the user sets by hand, from any other status.
-MANUAL_CLOSING_STATUSES = frozenset(
-    {TrackedVacancyStatus.DISCARDED, TrackedVacancyStatus.CLOSED}
-)
-
-# Where a manually closed tracked vacancy can be sent back.
-REOPEN_STATUSES = frozenset(
-    {TrackedVacancyStatus.SAVED, TrackedVacancyStatus.ANALYZED}
-)
-
-
 def validate_manual_status_change(
     current_status: TrackedVacancyStatus,
     new_status: TrackedVacancyStatus,
 ) -> None:
-    """Allow only discarded/closed and the return from them by hand.
+    """Allow only discarded and closed to be set by hand.
 
-    Every other status is produced by interactions, never set directly.
+    Every other status is produced by interactions or by reopen.
     """
 
     if new_status == current_status:
@@ -40,17 +31,40 @@ def validate_manual_status_change(
     if new_status in MANUAL_CLOSING_STATUSES:
         return
 
-    if (
-        current_status in MANUAL_CLOSING_STATUSES
-        and new_status in REOPEN_STATUSES
-    ):
-        return
-
     raise InvalidTrackedVacancyStatusChangeError(
         "Tracked vacancy status cannot be changed manually from "
         f"{current_status} to {new_status}. Only discarded and closed can "
-        "be set manually; the other statuses come from interactions."
+        "be set manually; the other statuses come from interactions. "
+        "Use POST /tracked-vacancies/{id}/reopen to return a discarded or "
+        "closed tracked vacancy to work."
     )
+
+
+async def reopen_tracked_vacancy(
+    db: AsyncSession,
+    tracked_vacancy: TrackedVacancy,
+) -> TrackedVacancy:
+    """Return a discarded or closed tracked vacancy to work.
+
+    The status and dates are recalculated from the interaction history.
+    """
+
+    if tracked_vacancy.status not in MANUAL_CLOSING_STATUSES:
+        raise InvalidTrackedVacancyStatusChangeError(
+            "Only discarded or closed tracked vacancies can be reopened. "
+            f"This one has status {tracked_vacancy.status}."
+        )
+
+    await sync_tracked_vacancy_with_history(
+        db,
+        tracked_vacancy,
+        keep_manual_status=False,
+    )
+
+    await db.commit()
+    await db.refresh(tracked_vacancy)
+
+    return tracked_vacancy
 
 
 async def get_resume_document_for_user(
@@ -179,8 +193,6 @@ async def update_tracked_vacancy(
 
         if new_status in MANUAL_CLOSING_STATUSES:
             update_data.setdefault("closed_at", datetime.now(timezone.utc))
-        elif tracked_vacancy.status in MANUAL_CLOSING_STATUSES:
-            update_data.setdefault("closed_at", None)
 
     for field_name, field_value in update_data.items():
         setattr(tracked_vacancy, field_name, field_value)

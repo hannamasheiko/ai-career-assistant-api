@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Form
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -17,6 +17,7 @@ from app.services.interaction_service import (
     get_interaction_for_user,
     get_interactions_for_tracked_vacancy,
     get_tracked_vacancy_for_interaction,
+    delete_interaction,
     update_interaction,
 )
 from datetime import datetime
@@ -91,6 +92,38 @@ async def create_interaction_endpoint(
         ) from error
 
     return interaction
+
+@router.delete(
+    "/interactions/{interaction_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_interaction_endpoint(
+    interaction_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Delete interaction and recalculate the tracked vacancy status.
+
+    The status is replayed from the remaining history. A manually discarded
+    or closed tracked vacancy keeps its status; its dates still follow the
+    history.
+    """
+
+    interaction = await get_interaction_for_user(
+        db=db,
+        interaction_id=interaction_id,
+        user_id=current_user.id,
+    )
+
+    if interaction is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Interaction not found.",
+        )
+
+    await delete_interaction(db=db, interaction=interaction)
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get(
     "/{tracked_vacancy_id}/interactions",
